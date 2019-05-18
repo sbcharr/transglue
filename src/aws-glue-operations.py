@@ -60,6 +60,7 @@ class PostgresDBGlueService:
         
         return df
 
+    # TODO: create a separate variadic function encapsulating db operating to avoid repetitiveness
 
     def update_jobs_table(self):
         value = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -81,6 +82,28 @@ class PostgresDBGlueService:
 
         log.info("column 'last_run_timestamp' in 'jobs' table is sucessfully updated")
 
+    def update_job_instance(self, job_name, job_instance, job_run_id, ctx=1):
+        if ctx == 0:
+            status = "completed"
+        else:
+            status = "in-progress"
+
+        conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+        cur = conn.cursor()
+        sql = f"update public.job_instances set job_run_id = '{job_run_id}', status = '{status}' where job_name = '{job_name}' and job_instance = '{job_instance}'"
+        try:
+            cur.execute(sql)
+        except Exception as err:
+            log.info("update public.job_instances ...")
+            log.error(err)
+            raise
+        finally:
+            cur.close()
+            conn.close()
+            log.info("successfully closed the db connection")
+
+        log.info("column 'job_run_id' in 'job_instances' table is sucessfully updated")
+    '''
     def update_job_details(self, job_name, job_instance, job_run_id):
         conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
         cur = conn.cursor()
@@ -99,8 +122,50 @@ class PostgresDBGlueService:
 
         log.info("column 'job_run_id' in 'job_details' table is sucessfully updated")
 
+    '''
+    def get_job_status(self, job_name, job_instance):
+        conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+        cur = conn.cursor()
+        
+        sql = f"select job_run_id, status from public.job_instances where job_name = '{job_name}' and job_instance = '{job_instance}'"
+        try:
+            cur.execute(sql)
+            row = cur.fetchall()
+        except Exception as err:
+            log.info("select public.job_instances ...")
+            log.error(err)
+            raise
+        finally:
+            cur.close()
+            conn.close()
+            log.info("successfully closed the db connection")
 
+        return row[0], row[1]
 
+    def get_job_details(self, job_name, job_instance):
+        conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+        cur = conn.cursor()
+        
+        sql = f"select table_name from public.job_details where job_name = '{job_name}' and job_instance = '{job_instance}'"
+        try:
+            cur.execute(sql)
+            rows = cur.fetchall()
+        except Exception as err:
+            log.info("select public.job_instances ...")
+            log.error(err)
+            raise
+        finally:
+            cur.close()
+            conn.close()
+            log.info("successfully closed the db connection")
+
+        tables = []
+        for row in rows:
+            tables.append(row[0])
+
+        return tables
+
+        
 
 class AwsGlueService:
     def __init__(self):
@@ -206,12 +271,13 @@ class AwsGlueService:
         log.info(f"glue job {job_name} is successfully deleted")
 
 
-    def start_glue_job(self, job_name, job_instance):
+    def start_glue_job(self, job_name, job_instance, tables):
         try:
             r = self.__client.start_job_run(
                 JobName=job_name,
                 Arguments={
-                    '--job-instance': job_instance
+                    '--job-instance': job_instance,
+                    '--tables': tables
                 }
             )
         except Exception as err:
@@ -303,22 +369,43 @@ def main_user(args, postgres_instance, glue_instance):
     job_name = args.jobName
     job_instance = args.jobInstance
 
-    job_run_id = glue_instance.start_glue_job(job_name, job_instance)
+    # get job run id and status of previous job before running a new instance. This is to ensure
+    # that previous job has completed.
+    job_run_id, status = postgres_instance.get_job_status(job_name, job_instance)
+    if status != 'completed':
+        while True:
+            job_status, err = glue_instance.get_glue_job_status(job_run_id)
+            print(err)
+            if err != None:
+                log.error("job {job_name} with job run id {job_run_id} is failed with error {err}")
+                break
 
-    postgres_instance.update_job_details(job_name, job_instance, job_run_id)
+            if job_status == 'SUCCEEDED':
+                log.info("job {job_name} with job run id {job_run_id} is successfully completed")
+                break
+            time.sleep(20)
+        # update control table with job status, either in-progress or completed
+        postgres_instance.update_job_instance(job_name, job_instance, job_run_id, ctx=0)
+
+    tables = postgres_instance.get_job_details(job_name, job_instance)
+    job_run_id = glue_instance.start_glue_job(job_name, job_instance, tables)
+    postgres_instance.update_job_instance(job_name, job_instance, job_run_id)
 
     while True:
         job_status, err = glue_instance.get_glue_job_status(job_run_id)
-        print(err)
+        # print(err)
         if err != None:
             log.error("job {job_name} with job run id {job_run_id} is failed with error {err}")
-            sys.exit(1) 
+            break
 
         if job_status == 'SUCCEEDED':
             log.info("job {job_name} with job run id {job_run_id} is successfully completed")
             break
         time.sleep(20)
 
+    postgres_instance.update_job_instance(job_name, job_instance, job_run_id, ctx=0)
+
+    return
 
 if __name__ == "__main__":
     set_logger()        # set logger for the app
@@ -333,3 +420,4 @@ if __name__ == "__main__":
         main_user(args, postgres_instance, glue_instance)
     else:
         raise ValueError("invalid --userType, type -h for help")
+
