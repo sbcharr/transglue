@@ -8,22 +8,30 @@ import pandas.io.sql as sqlio
 from datetime import datetime
 
 
-
-def set_logger():
-    log.basicConfig(level=log.INFO)
-
 def set_flag_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--jobName", help="job name to execute")
     parser.add_argument("--jobInstance", help="sequence number of job instance")
-    parser.add_argument("--userType", help="user who runs this job, one of admin or user")
+    parser.add_argument("--userType", help="user who runs this job, one of 'admin' or 'user'")
+    parser.add_argument("--maxDpu", help="max dpu that AWS Glue uses, available only with user type 'user'")
+    parser.add_argument("--logLevel", help="log level, values are 'debug', 'info', 'warning', 'error', 'critical'")
 
     args = parser.parse_args()
 
     return args
 
+def set_logger(log_level):
+    log_switcher = {
+        'debug': log.DEBUG,
+        'info': log.INFO,
+        'warning': log.WARNING,
+        'error': log.ERROR,
+        'critical': log.CRITICAL
+    }
+    log.basicConfig(level=log_switcher.get(log_level, log.INFO))
 
-class PostgresDBGlueService:
+
+class PostgresDBService:
     def __init__(self):
         self.__host = os.environ['GLUE_DB_HOST']
         self.__dbname = os.environ['GLUE_JOBS_DB']
@@ -82,8 +90,8 @@ class PostgresDBGlueService:
 
         log.info("column 'last_run_timestamp' in 'jobs' table is sucessfully updated")
 
-    def update_job_instance(self, job_name, job_instance, job_run_id, ctx=1):
-        if ctx == 0:
+    def update_job_instance(self, job_name, job_instance, job_run_id, job_status_ctx=1):
+        if job_status_ctx == 0:
             status = "completed"
         else:
             status = "in-progress"
@@ -166,12 +174,15 @@ class PostgresDBGlueService:
         return tables
 
         
-
 class AwsGlueService:
     def __init__(self):
         self.__client = boto3.client('glue')
 
 
+class GlueJobService(AwsGlueService):
+    def __init__(self):
+        AwsGlueService.__init__(self)
+    
     def get_glue_jobs(self):
         is_run = 0
         next_token = ""
@@ -271,18 +282,32 @@ class AwsGlueService:
         log.info(f"glue job {job_name} is successfully deleted")
 
 
-    def start_glue_job(self, job_name, job_instance, tables):
-        try:
-            r = self.__client.start_job_run(
-                JobName=job_name,
-                Arguments={
-                    '--job-instance': job_instance,
-                    '--tables': tables
-                }
-            )
-        except Exception as err:
-            log.error(err)
-            raise
+    def start_glue_job(self, job_name, job_instance, tables, max_dpu=None):
+        if max_dpu is not None:
+            try:
+                r = self.__client.start_job_run(
+                    JobName=job_name,
+                    Arguments={
+                        '--job-instance': job_instance,
+                        '--tables': tables
+                    },
+                    MaxCapacity=max_dpu
+                )
+            except Exception as err:
+                log.error(err)
+                raise
+        else:
+            try:
+                r = self.__client.start_job_run(
+                    JobName=job_name,
+                    Arguments={
+                        '--job-instance': job_instance,
+                        '--tables': tables
+                    }
+                )
+            except Exception as err:
+                log.error(err)
+                raise
 
         log.info(f"glue job {job_name} is successfully started with jo id {r['JobRunId']}")
 
@@ -296,6 +321,100 @@ class AwsGlueService:
             raise
 
         return r['JobRun']['JobRunState'], r['JobRun']['ErrorMessage']
+
+
+class GlueCrawlerService(AwsGlueService):
+    def __init__(self):
+        AwsGlueService.__init__(self)
+
+    #TODO: create_database(), list_crawler(), create_crawler(), start_crawler()
+    # def is_crawler_available(self, name):
+    #     try:
+    #         _ = self.__client.get_crawler(
+    #             Name=name
+    #         )
+    #     except ClientError as e:
+    #         if e.response['Error']['Code'] == "EntityNotFoundException":
+    #             log.info(e.response['Error']['Message'])
+    #             return False
+    #         else:
+    #             log.error(e.response['Error']['Message'])
+
+    #     return True
+
+    def create_crawler_service(self, name, role, catalog_db_name, s3_target_path, description=None, table_prefix=None):
+        try:
+            # if  not self.is_crawler_available(name):
+            _ = self.__client.create_crawler(
+                Name=name,
+                Role=role,
+                DatabaseName=catalog_db_name,
+                Description=description,
+                Targets={
+                    'S3Targets': [
+                        {
+                            'Path': s3_target_path
+                        }
+                    ]
+                },
+                SchemaChangePolicy={
+                    'UpdateBehavior': 'LOG',
+                    'DeleteBehavior': 'DEPRECATE_IN_DATABASE'
+                }
+            )
+            # else:
+            #    log.info(f"crawler {name} is already available")
+        except ClientError as e:
+            if e.response['Error']['Code'] == "AlreadyExistsException":
+                log.info(f"crawler {name} already exists")
+            else:
+                log.error(f"error: {e.response['Error']['Message']}")
+                raise
+    
+    def start_glue_crawler(self, name):
+        try:
+            _ = self.__client.start_crawler(
+                Name=name
+            )
+        except ClientError as e:
+            if e.response['Error']['Code'] == "CrawlerRunningException":
+                log.info(f"crawler {name} is already running, please run at a later time")
+            else:
+                log.error(f"error: {e.response['Error']['Message']}")
+        
+    def delete_glue_crawler(self, name):
+        try:
+            _ = self.__client.delete_crawler(
+                    Name=name
+                )
+        except ClientError as e:
+            if e.response['Error']['Code'] == "CrawlerRunningException":
+                log.error(f"crawler {name} is currently running, try again later")
+                raise
+            else:
+                log.error(f"error: {e.response['Error']['Message']}")
+                raise
+
+class GlueCatalogService(AwsGlueService):
+    def __init__(self):
+        AwsGlueService.__init__(self)
+
+    def create_database_in_catalog(self, name, catalog_id=None, description=None, location_uri=None):
+        try:  
+            _ = self.__client.create_database(
+                CatalogId=catalog_id,
+                DatabaseInput={
+                    'Name': name,
+                    'Description': description,
+                    'LocationUri': location_uri
+                }
+            )
+        except ClientError as e:
+            if e.response['Error']['Code'] == "AlreadyExistsException":
+                log.info(f"database {name} already exists in catalog {catalog_id}")
+        except ClientError as e:
+            log.error(f"error: {e.response['Error']['Message']}")
+            raise
 
 
 def sync_jobs(postgres_instance, glue_instance):
@@ -341,7 +460,7 @@ def sync_jobs(postgres_instance, glue_instance):
             row['max_capacity']
         )
 
-    # update any existing job whose definition has been changed recently on Postgres db
+    # update any existing job whose definition has been changed recently in Postgres db
     for _, row in df_update_recs.iterrows():
         log.info(f"updating job {row['job_name']}...")
         glue_instance.update_glue_job(
@@ -361,13 +480,14 @@ def sync_jobs(postgres_instance, glue_instance):
     return
 
 
-def main_admin(postgres_instance, glue_instance):
+def main_admin(max_dpu, postgres_instance, glue_instance):
     sync_jobs(postgres_instance, glue_instance)
 
 
 def main_user(args, postgres_instance, glue_instance):
     job_name = args.jobName
     job_instance = args.jobInstance
+    max_dpu = args.maxDpu
 
     # get job run id and status of previous job before running a new instance. This is to ensure
     # that previous job has completed.
@@ -377,45 +497,46 @@ def main_user(args, postgres_instance, glue_instance):
             job_status, err = glue_instance.get_glue_job_status(job_run_id)
             print(err)
             if err != None:
-                log.error("job {job_name} with job run id {job_run_id} is failed with error {err}")
+                log.error(f"job {job_name} with job run id {job_run_id} is failed with error {err}")
                 break
 
             if job_status == 'SUCCEEDED':
-                log.info("job {job_name} with job run id {job_run_id} is successfully completed")
+                log.info(f"job {job_name} with job run id {job_run_id} is successfully completed")
                 break
             time.sleep(20)
         # update control table with job status, either in-progress or completed
         postgres_instance.update_job_instance(job_name, job_instance, job_run_id, ctx=0)
 
     tables = postgres_instance.get_job_details(job_name, job_instance)
-    job_run_id = glue_instance.start_glue_job(job_name, job_instance, tables)
+    job_run_id = glue_instance.start_glue_job(job_name, job_instance, max_dpu, tables)
     postgres_instance.update_job_instance(job_name, job_instance, job_run_id)
 
     while True:
         job_status, err = glue_instance.get_glue_job_status(job_run_id)
         # print(err)
         if err != None:
-            log.error("job {job_name} with job run id {job_run_id} is failed with error {err}")
+            log.error(f"job {job_name} with job run id {job_run_id} is failed with error {err}")
             break
 
         if job_status == 'SUCCEEDED':
-            log.info("job {job_name} with job run id {job_run_id} is successfully completed")
+            log.info(f"job {job_name} with job run id {job_run_id} is successfully completed")
             break
         time.sleep(20)
 
-    postgres_instance.update_job_instance(job_name, job_instance, job_run_id, ctx=0)
+    postgres_instance.update_job_instance(job_name, job_instance, job_run_id, job_status_ctx=0)
 
     return
 
-if __name__ == "__main__":
-    set_logger()        # set logger for the app
-    args = set_flag_parser()   # setup parser to parse named arguments
 
-    postgres_instance = PostgresDBGlueService()
-    glue_instance =  AwsGlueService()
+if __name__ == "__main__":
+    args = set_flag_parser()        # setup parser to parse named arguments
+    set_logger(args.logLevel)       # set logger for the app
+
+    postgres_instance = PostgresDBService()
+    glue_instance =  GlueJobService()
     
     if args.userType == 'admin':
-        main_admin(postgres_instance, glue_instance)
+        main_admin(args.maxDpu, postgres_instance, glue_instance)
     elif args.userType == 'user':
         main_user(args, postgres_instance, glue_instance)
     else:
