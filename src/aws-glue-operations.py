@@ -6,9 +6,10 @@ import psycopg2
 import pandas as pd
 import pandas.io.sql as sqlio
 from datetime import datetime
+from abc import ABC, abstractmethod
 
 
-def set_flag_parser():
+def flag_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--jobName", help="job name to execute")
     parser.add_argument("--jobInstance", help="sequence number of job instance")
@@ -31,7 +32,35 @@ def set_logger(log_level):
     log.basicConfig(level=log_switcher.get(log_level, log.INFO))
 
 
-class PostgresDBService:
+# MetadataDBService is an abstract class
+class MetadataDBService(ABC):
+    @abstractmethod
+    def __create_db_conn(self, host, dbname, user, password):
+        pass
+    
+    @abstractmethod
+    def get_glue_jobs_from_db(self):
+        pass
+
+    @abstractmethod
+    def update_jobs_table(self):
+        pass
+
+    @abstractmethod
+    def update_job_instance(self, job_name, job_instance, job_run_id, job_status_ctx):
+        pass
+
+    @abstractmethod
+    def get_job_status(self, job_name, job_instance):
+        pass
+
+    @abstractmethod
+    def get_job_details(self, job_name, job_instance):
+        pass
+
+
+
+class PostgresDBService(MetadataDBService):
     def __init__(self):
         self.__host = os.environ['GLUE_DB_HOST']
         self.__dbname = os.environ['GLUE_JOBS_DB']
@@ -529,7 +558,7 @@ def main_user(args, postgres_instance, glue_instance):
 
 
 if __name__ == "__main__":
-    args = set_flag_parser()        # setup parser to parse named arguments
+    args = flag_parser()        # setup parser to parse named arguments
     set_logger(args.logLevel)       # set logger for the app
 
     postgres_instance = PostgresDBService()
