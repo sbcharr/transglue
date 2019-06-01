@@ -22,14 +22,14 @@ def flag_parser():
     return args
 
 def set_logger(log_level):
-    log_switcher = {
+    log_level_switcher = {
         'debug': log.DEBUG,
         'info': log.INFO,
         'warning': log.WARNING,
         'error': log.ERROR,
         'critical': log.CRITICAL
     }
-    log.basicConfig(level=log_switcher.get(log_level, log.INFO))
+    log.basicConfig(level=log_level_switcher.get(log_level, log.INFO))
 
 
 # MetadataDBService is an abstract class
