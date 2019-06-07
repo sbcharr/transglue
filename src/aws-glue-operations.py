@@ -10,11 +10,15 @@ from abc import ABC, abstractmethod
 
 
 def flag_parser():
+    """
+    A function to parse parameterized input to command line arguments. It returns the object
+    containing values of each input argument in a key/value fashion.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--jobName", help="job name to execute")
     parser.add_argument("--jobInstance", help="sequence number of job instance")
     parser.add_argument("--userType", help="user who runs this job, one of 'admin' or 'user'")
-    parser.add_argument("--maxDpu", help="max dpu that AWS Glue uses, available only with user type 'user'")
+    parser.add_argument("--maxDpu", help="(optional) max dpu that AWS Glue uses, available only with user type 'user'")
     parser.add_argument("--logLevel", help="log level, values are 'debug', 'info', 'warning', 'error', 'critical'")
 
     args = parser.parse_args()
@@ -22,6 +26,9 @@ def flag_parser():
     return args
 
 def set_logger(log_level):
+    """
+    Main logger set for the program. Default log level is set to INFO.
+    """
     log_level_switcher = {
         'debug': log.DEBUG,
         'info': log.INFO,
@@ -32,35 +39,60 @@ def set_logger(log_level):
     log.basicConfig(level=log_level_switcher.get(log_level, log.INFO))
 
 
-# MetadataDBService is an abstract class
 class MetadataDBService(ABC):
+    """
+    MetadataDBService is an abstract class which defines the various signatures for classes
+    which implements these function.
+    """
     @abstractmethod
     def __create_db_conn(self, host, dbname, user, password):
+        """
+        creates a database objects to the underlying db
+        """
         pass
     
     @abstractmethod
     def get_glue_jobs_from_db(self):
+        """
+        this is responsible to get all related glue jobs from AWS Glue service.
+        """
         pass
 
     @abstractmethod
     def update_jobs_table(self):
+        """
+        this function updates the control table called 'jobs' in metadata db.
+        """
         pass
 
     @abstractmethod
     def update_job_instance(self, job_name, job_instance, job_run_id, job_status_ctx):
+        """
+        this function updates the control table called 'jobs_instances' in metadata db.
+        """
         pass
 
     @abstractmethod
     def get_job_status(self, job_name, job_instance):
+        """
+        this function retrives job status from metadata db.
+        """
         pass
 
     @abstractmethod
     def get_job_details(self, job_name, job_instance):
+        """
+        this function retrives job details from metadata db.
+        """
         pass
 
 
 
 class PostgresDBService(MetadataDBService):
+    """
+    PostgresDBService inherits  the abstract class MetadataDBService and implements its
+    abstract methods.
+    """
     def __init__(self):
         self.__host = os.environ['GLUE_DB_HOST']
         self.__dbname = os.environ['GLUE_JOBS_DB']
@@ -338,7 +370,7 @@ class GlueJobService(AwsGlueService):
                 log.error(err)
                 raise
 
-        log.info(f"glue job {job_name} is successfully started with jo id {r['JobRunId']}")
+        log.info(f"glue job {job_name} is successfully started with job id {r['JobRunId']}")
 
         return r['JobRunId']
 
@@ -556,9 +588,15 @@ def main_user(args, postgres_instance, glue_instance):
 
     return
 
-
-if __name__ == "__main__":
+def main():
     args = flag_parser()        # setup parser to parse named arguments
+    print(isinstance(int(args.jobInstance), int))
+    assert isinstance(args.jobName, str), "invalid jobName"
+    assert isinstance(args.jobInstance, int), "invalid jobInstance"
+    assert isinstance(args.userType, str) and args.userType in ['user', 'admin'], "invalid userType"
+    assert isinstance(args.maxDpu, float)
+    assert args.logLevel in ['debug', 'info', 'warning', 'error', 'critical'], "invalid log level"
+
     set_logger(args.logLevel)       # set logger for the app
 
     postgres_instance = PostgresDBService()
@@ -571,3 +609,16 @@ if __name__ == "__main__":
     else:
         raise ValueError("invalid --userType, type -h for help")
 
+def main_test():
+    pass
+    # args = flag_parser()
+    # print("jobName:", args.jobName)
+    # print("jobInstance:", args.jobInstance)
+    # print("userType:", args.userType)
+    # print("maxDpu:", args.maxDpu)
+    # print("logLevel:", args.logLevel)
+
+
+if __name__ == "__main__":
+    main()
+    # main_test()
