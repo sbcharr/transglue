@@ -1,5 +1,5 @@
 create_control_schema="CREATE SCHEMA IF NOT EXISTS job_control;"
-create_table_jobs="CREATE TABLE IF NOT EXISTS jobs ( \
+create_table_jobs="CREATE TABLE IF NOT EXISTS job_control.jobs ( \
     job_name text PRIMARY KEY, \
     job_description text, \
     log_uri text, \
@@ -18,7 +18,7 @@ create_table_jobs="CREATE TABLE IF NOT EXISTS jobs ( \
     is_active char(1) \
 );"
 
-create_table_job_instances="CREATE TABLE IF NOT EXISTS job_instances ( \
+create_table_job_instances="CREATE TABLE IF NOT EXISTS job_control.job_instances ( \
     job_name text REFERENCES jobs(job_name), \
     job_instance int NOT NULL, \
     job_run_id text, \
@@ -26,7 +26,7 @@ create_table_job_instances="CREATE TABLE IF NOT EXISTS job_instances ( \
     PRIMARY KEY (job_name, job_instance) \
 );"
 
-create_table_job_details="CREATE TABLE IF NOT EXISTS job_details ( \
+create_table_job_details="CREATE TABLE IF NOT EXISTS job_control.job_details ( \
     job_name text REFERENCES jobs(job_name), \
     job_instance int REFERENCES job_instances(job_instance), \
     table_name text, \
@@ -34,3 +34,5 @@ create_table_job_details="CREATE TABLE IF NOT EXISTS job_details ( \
     last_run_timestamp, \
     PRIMARY KEY (job_name, job_instance, table_name) \
 );"
+
+use_schema="SET search_path TO job_control;"
