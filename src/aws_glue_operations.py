@@ -2,7 +2,7 @@ import boto3
 from botocore.exceptions import ClientError
 import logging as log
 import configparser
-import argparse, os, sys, time, datetime
+import argparse, os, sys, time
 import psycopg2
 import pandas as pd
 import pandas.io.sql as sqlio
@@ -21,6 +21,12 @@ os.environ['GLUE_DB_HOST'] = config['postgres-db']['GLUE_DB_HOST']
 os.environ['GLUE_JOBS_DB'] = config['postgres-db']['GLUE_JOBS_DB']
 os.environ['GLUE_POSTGRES_USER'] = config['postgres-db']['GLUE_POSTGRES_USER']
 os.environ['GLUE_POSTGRES_PASSWORD'] = config['postgres-db']['GLUE_POSTGRES_PASSWORD']
+
+os.environ['AWS_ACCESS_KEY_ID']=config['aws-creds']['aws_access_key_id']
+os.environ['AWS_SECRET_ACCESS_KEY']=config['aws-creds']['aws_secret_access_key']
+os.environ['REGION_NAME']=config['aws-creds']['region_name']
+
+
 
 
 def flag_parser():
@@ -153,17 +159,21 @@ class PostgresDBService(MetadataDBService):
         """
         get all glue jobs from the 'jobs' table. This function return a pandas sql dataframe
         """
-        conn, _ = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+        conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
         sql = sq.select_from_jobs
         try: 
+            cur.execute(sq.use_schema)
             df = sqlio.read_sql_query(sql, conn)
         except Exception as err: 
             log.info("Error: select *")
             log.error(err)
             raise
         finally:
+            cur.close()
             conn.close()
             log.info("successfully closed the db connection")
+
+        log.info("successfully executed function 'get_glue_jobs_from_db'")
         
         return df
 
@@ -174,8 +184,9 @@ class PostgresDBService(MetadataDBService):
 
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
         
-        sql = f"update job_control.jobs set last_run_timestamp = '{value}'"
+        sql = sq.update_table_jobs.format(value)
         try:
+            cur.execute(sq.use_schema)
             cur.execute(sql)
         except Exception as err:
             log.info("update public.jobs ...")
@@ -198,6 +209,7 @@ class PostgresDBService(MetadataDBService):
         
         sql = f"update public.job_instances set job_run_id = '{job_run_id}', status = '{status}' where job_name = '{job_name}' and job_instance = '{job_instance}'"
         try:
+            cur.execute(sq.use_schema)
             cur.execute(sql)
         except Exception as err:
             log.info("update public.job_instances ...")
@@ -234,6 +246,7 @@ class PostgresDBService(MetadataDBService):
                 
         sql = sq.select_from_job_instances.format(job_name, job_instance)
         try:
+            cur.execute(sq.use_schema)
             cur.execute(sql)
             row = cur.fetchall()
         except Exception as err:
@@ -252,6 +265,7 @@ class PostgresDBService(MetadataDBService):
                 
         sql = sq.select_from_job_details.format(job_name, job_instance)
         try:
+            cur.execute(sq.use_schema)
             cur.execute(sql)
             rows = cur.fetchall()
         except Exception as err:
@@ -272,7 +286,7 @@ class PostgresDBService(MetadataDBService):
         
 class AwsGlueService:
     def __init__(self):
-        self.__client = boto3.client('glue')
+        self.client = boto3.client('glue', region_name = os.environ['REGION_NAME'], aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'], aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'])
 
 
 class GlueJobService(AwsGlueService):
@@ -285,7 +299,7 @@ class GlueJobService(AwsGlueService):
         jobs = []
         try:
             while is_run == 0:
-                r = self.__client.get_jobs(NextToken=next_token, MaxResults=100)
+                r = self.client.get_jobs(NextToken=next_token, MaxResults=100)
                 for job in r['Jobs']:
                     jobs.append(job['Name'])
                 if 'NextToken' in r:
@@ -304,25 +318,29 @@ class GlueJobService(AwsGlueService):
                         description, 
                         role, 
                         script_loc, 
+                        tags,
                         command_name='glueetl', 
                         max_concurrent_runs=3, 
                         max_retries=1, 
                         timeout=180, 
                         max_capacity=2.0):
         try:
-            _ = self.__client.create_job(
+            _ = self.client.create_job(
                 Name=job_name,
                 Description=description,
                 Role=role,
                 ExecutionProperty={
-                    'MaxConcurrentRuns': max_concurrent_runs,
+                    'MaxConcurrentRuns': int(max_concurrent_runs),
                 },
                 Command={'Name': command_name,
                         'ScriptLocation': script_loc
                         },
-                MaxRetries=max_retries,
-                Timeout=timeout,
-                MaxCapacity=max_capacity
+                MaxRetries=int(max_retries),
+                Timeout=int(timeout),
+                MaxCapacity=max_capacity,
+                Tags={
+                    'key': tags
+                }
             )
         except Exception as err:
             log.error(err)
@@ -342,20 +360,20 @@ class GlueJobService(AwsGlueService):
                         timeout=180, 
                         max_capacity=2.0):
         try:
-            _ = self.__client.update_job(
+            _ = self.client.update_job(
                 JobName=job_name,
                 JobUpdate={
                     'Description': description,
                     'Role': role,
                     'ExecutionProperty': {
-                        'MaxConcurrentRuns': max_concurrent_runs
+                        'MaxConcurrentRuns': int(max_concurrent_runs)
                     },
                     'Command': {
                         'Name': command_name,
                         'ScriptLocation': script_loc
                     },
-                    'MaxRetries': max_retries,
-                    'Timeout': timeout,
+                    'MaxRetries': int(max_retries),
+                    'Timeout': int(timeout),
                     'MaxCapacity': max_capacity
                 }
             )
@@ -367,13 +385,16 @@ class GlueJobService(AwsGlueService):
 
 
     def delete_glue_job(self, job_name):
+        print(job_name)
         try:
-            _ = self.__client.delete_job(
+            r = self.client.delete_job(
                 JobName=job_name
             )
         except Exception as err:
             log.error(err)
             raise
+
+        print(r['JobName'])
 
         log.info(f"glue job {job_name} is successfully deleted")
 
@@ -381,7 +402,7 @@ class GlueJobService(AwsGlueService):
     def start_glue_job(self, job_name, job_instance, tables, max_dpu=None):
         if max_dpu is not None:
             try:
-                r = self.__client.start_job_run(
+                r = self.client.start_job_run(
                     JobName=job_name,
                     Arguments={
                         '--job-instance': job_instance,
@@ -394,7 +415,7 @@ class GlueJobService(AwsGlueService):
                 raise
         else:
             try:
-                r = self.__client.start_job_run(
+                r = self.client.start_job_run(
                     JobName=job_name,
                     Arguments={
                         '--job-instance': job_instance,
@@ -411,7 +432,7 @@ class GlueJobService(AwsGlueService):
 
     def get_glue_job_status(self, job_name, job_run_id):
         try:
-            r = self.__client.get_job_run(JobName=job_name, RunId=job_run_id, PredecessorsIncluded=False)
+            r = self.client.get_job_run(JobName=job_name, RunId=job_run_id, PredecessorsIncluded=False)
         except Exception as err:
             log.error(err)
             raise
@@ -426,7 +447,7 @@ class GlueCrawlerService(AwsGlueService):
     def create_crawler_service(self, name, role, catalog_db_name, s3_target_path, description=None, table_prefix=None):
         try:
             # if  not self.is_crawler_available(name):
-            _ = self.__client.create_crawler(
+            _ = self.client.create_crawler(
                 Name=name,
                 Role=role,
                 DatabaseName=catalog_db_name,
@@ -454,7 +475,7 @@ class GlueCrawlerService(AwsGlueService):
     
     def start_glue_crawler(self, name):
         try:
-            _ = self.__client.start_crawler(
+            _ = self.client.start_crawler(
                 Name=name
             )
         except ClientError as e:
@@ -465,7 +486,7 @@ class GlueCrawlerService(AwsGlueService):
         
     def delete_glue_crawler(self, name):
         try:
-            _ = self.__client.delete_crawler(
+            _ = self.client.delete_crawler(
                     Name=name
                 )
         except ClientError as e:
@@ -482,7 +503,7 @@ class GlueCatalogService(AwsGlueService):
 
     def create_database_in_catalog(self, name, catalog_id=None, description=None, location_uri=None):
         try:  
-            _ = self.__client.create_database(
+            _ = self.client.create_database(
                 CatalogId=catalog_id,
                 DatabaseInput={
                     'Name': name,
@@ -505,18 +526,21 @@ def sync_jobs(postgres_instance, glue_instance):
     '''
 
     # Get all glue jobs from Postgres db
-    df_jobs_all = postgres_instance.get_glue_jobs_from_db()  
-
+    df_jobs_all = postgres_instance.get_glue_jobs_from_db()
+    if df_jobs_all.shape[0] == 0:
+        log.info("empty jobs table, exiting function...")
+        return
+    
     # get_glue_jobs retuns all job names from AWS Glue as a list
     df_glue_jobs = pd.DataFrame(glue_instance.get_glue_jobs(), columns=['job_name'])  
-    
+    print(df_glue_jobs)
     # pandas dataframe is used to identify jobs that are to be created, updated and deleted in AWS Glue Service
     df_temp = pd.merge(df_jobs_all, df_glue_jobs, left_on='job_name', right_on='job_name', how='outer', indicator=True)
     
-    df_insert_recs = df_temp[df_temp['_merge'] == 'left_only' & (df_temp['is_active'] == 'Y')]
-    df_update_recs = df_temp[(df_temp['_merge'] == 'both') & (df_temp['is_active'] != 'Y') & (df_temp['modified_timestamp'] > df_temp['last_run_timestamp'])]
-    df_delete_recs = df_temp[df_temp['_merge'] == 'left_only' & (df_temp['is_active'] != 'Y')]
-
+    df_insert_recs = df_temp[(df_temp['_merge'] == 'left_only') & (df_temp['is_active'] == 'Y')]
+    df_update_recs = df_temp[(df_temp['_merge'] == 'both') & (df_temp['is_active'] == 'Y') & (df_temp['modified_timestamp'] > df_temp['last_run_timestamp'])]
+    df_delete_recs = df_temp[(df_temp['_merge'] == 'both') & (df_temp['is_active'] != 'Y')]
+    print(df_delete_recs)
     # print(df_insert_recs.dtypes)
 
     # delete operation to delete any inactive job
@@ -534,12 +558,14 @@ def sync_jobs(postgres_instance, glue_instance):
             row['job_description'], 
             row['role_arn'], 
             row['script_location'],
-            row['comman_name'], 
+            row['tags'],
+            row['command_name'], 
             row['max_concurrent_runs'],
             row['max_retries'], 
             row['timeout_minutes'], 
             row['max_capacity']
         )
+
 
     # update any existing job whose definition has been changed recently in Postgres db
     for _, row in df_update_recs.iterrows():
@@ -549,16 +575,16 @@ def sync_jobs(postgres_instance, glue_instance):
             row['job_description'], 
             row['role_arn'], 
             row['script_location'],
-            row['comman_name'], 
+            row['command_name'], 
             row['max_concurrent_runs'],
             row['max_retries'], 
             row['timeout_minutes'], 
             row['max_capacity']
         )
-
+    
     postgres_instance.update_jobs_table()
 
-    log.info("successfully synchronizd jobs between database and AWS Glue at {}".format(datetime.datetime.now()))
+    log.info("successfully synchronizd jobs between database and AWS Glue at {}".format(datetime.now()))
 
 
 def main_admin(max_dpu, postgres_instance, glue_instance):
@@ -618,8 +644,8 @@ def main():
     
     if args.userType == 'admin':
         # creates necessary db objects for job control
-        postgres_instance.create_postgres_db_objects()
-        # main_admin(args.maxDpu, postgres_instance, glue_instance)
+        # postgres_instance.create_postgres_db_objects()
+        main_admin(args.maxDpu, postgres_instance, glue_instance)
     elif args.userType == 'user':
         main_user(args, postgres_instance, glue_instance)
     else:

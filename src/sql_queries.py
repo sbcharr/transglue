@@ -5,7 +5,7 @@ create_table_jobs="CREATE TABLE IF NOT EXISTS jobs ( \
     log_uri text, \
     role_arn text NOT NULL, \
     max_concurrent_runs int DEFAULT 1, \
-    comman_name text DEFAULT 'glueetl', \
+    command_name text DEFAULT 'glueetl', \
     script_location text not null, \
     max_retries int DEFAULT 1, \
     timeout_minutes int DEFAULT 240, \
@@ -15,24 +15,26 @@ create_table_jobs="CREATE TABLE IF NOT EXISTS jobs ( \
     created_timestamp timestamp DEFAULT now() NOT NULL, \
     modified_timestamp timestamp DEFAULT now() NOT NULL, \
     last_run_timestamp timestamp DEFAULT '1970-01-01 00:00:00' NOT NULL, \
-    is_active char(1) \
+    is_active char(1) DEFAULT 'N' \
 );"
 
 create_table_job_instances="CREATE TABLE IF NOT EXISTS job_instances ( \
-    job_name text REFERENCES jobs(job_name), \
+    job_name text NOT NULL, \
     job_instance int NOT NULL, \
     job_run_id text, \
     status text, \
-    PRIMARY KEY (job_name, job_instance) \
+    PRIMARY KEY (job_name, job_instance), \
+    FOREIGN KEY (job_name) REFERENCES jobs (job_name) \
 );"
 
 create_table_job_details="CREATE TABLE IF NOT EXISTS job_details ( \
-    job_name text REFERENCES jobs(job_name), \
-    job_instance int REFERENCES job_instances(job_instance), \
+    job_name text NOT NULL, \
+    job_instance int NOT NULL, \
     table_name text, \
-    created_timestamp, \
-    last_run_timestamp, \
-    PRIMARY KEY (job_name, job_instance, table_name) \
+    created_timestamp timestamp DEFAULT now(), \
+    last_run_timestamp timestamp, \
+    PRIMARY KEY (job_name, job_instance, table_name), \
+    FOREIGN KEY (job_name, job_instance) REFERENCES job_instances (job_name, job_instance) \
 );"
 
 use_schema="SET search_path TO job_control;"
@@ -40,5 +42,7 @@ use_schema="SET search_path TO job_control;"
 select_from_jobs = "select * from jobs;"
 select_from_job_instances = "select job_run_id, status from job_instances where job_name = '{}' and job_instance = '{}';"
 select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = '{}'"
+
+update_table_jobs = "update jobs set last_run_timestamp = '{}' where is_active = 'Y'"
 
 create_queries = [create_control_schema, use_schema, create_table_jobs, create_table_job_instances, create_table_job_details]
