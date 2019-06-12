@@ -1,5 +1,5 @@
 create_control_schema="CREATE SCHEMA IF NOT EXISTS job_control;"
-create_table_jobs="CREATE TABLE IF NOT EXISTS job_control.jobs ( \
+create_table_jobs="CREATE TABLE IF NOT EXISTS jobs ( \
     job_name text PRIMARY KEY, \
     job_description text, \
     log_uri text, \
@@ -18,7 +18,7 @@ create_table_jobs="CREATE TABLE IF NOT EXISTS job_control.jobs ( \
     is_active char(1) \
 );"
 
-create_table_job_instances="CREATE TABLE IF NOT EXISTS job_control.job_instances ( \
+create_table_job_instances="CREATE TABLE IF NOT EXISTS job_instances ( \
     job_name text REFERENCES jobs(job_name), \
     job_instance int NOT NULL, \
     job_run_id text, \
@@ -26,7 +26,7 @@ create_table_job_instances="CREATE TABLE IF NOT EXISTS job_control.job_instances
     PRIMARY KEY (job_name, job_instance) \
 );"
 
-create_table_job_details="CREATE TABLE IF NOT EXISTS job_control.job_details ( \
+create_table_job_details="CREATE TABLE IF NOT EXISTS job_details ( \
     job_name text REFERENCES jobs(job_name), \
     job_instance int REFERENCES job_instances(job_instance), \
     table_name text, \
@@ -36,3 +36,9 @@ create_table_job_details="CREATE TABLE IF NOT EXISTS job_control.job_details ( \
 );"
 
 use_schema="SET search_path TO job_control;"
+
+select_from_jobs = "select * from jobs;"
+select_from_job_instances = "select job_run_id, status from job_instances where job_name = '{}' and job_instance = '{}';"
+select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = '{}'"
+
+create_queries = [create_control_schema, use_schema, create_table_jobs, create_table_job_instances, create_table_job_details]

@@ -1,13 +1,26 @@
 import boto3
 from botocore.exceptions import ClientError
 import logging as log
+import configparser
 import argparse, os, sys, time, datetime
 import psycopg2
 import pandas as pd
 import pandas.io.sql as sqlio
 from datetime import datetime
-from abc import ABC, abstractmethod
-from src.sql-queries import *
+from abc import (
+    ABC, 
+    abstractmethod,
+)
+import sql_queries as sq
+
+
+config = configparser.ConfigParser()
+config.read(os.path.join(os.getcwd(), 'dl.cfg'))
+
+os.environ['GLUE_DB_HOST'] = config['postgres-db']['GLUE_DB_HOST']
+os.environ['GLUE_JOBS_DB'] = config['postgres-db']['GLUE_JOBS_DB']
+os.environ['GLUE_POSTGRES_USER'] = config['postgres-db']['GLUE_POSTGRES_USER']
+os.environ['GLUE_POSTGRES_PASSWORD'] = config['postgres-db']['GLUE_POSTGRES_PASSWORD']
 
 
 def flag_parser():
@@ -16,11 +29,11 @@ def flag_parser():
     containing values of each input argument in a key/value fashion.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--jobName", help="job name to execute")
-    parser.add_argument("--jobInstance", help="sequence number of job instance")
+    parser.add_argument("--jobName", help="(optional for admin) job name to execute")
+    parser.add_argument("--jobInstance", help="(optional for admin) sequence number of job instance")
     parser.add_argument("--userType", help="user who runs this job, one of 'admin' or 'user'")
     parser.add_argument("--maxDpu", help="(optional) max dpu that AWS Glue uses, available only with user type 'user'")
-    parser.add_argument("--logLevel", help="log level, values are 'debug', 'info', 'warning', 'error', 'critical'")
+    parser.add_argument("--logLevel", help="(optional) log level, values are 'debug', 'info', 'warning', 'error', 'critical'")
 
     args = parser.parse_args()
 
@@ -46,7 +59,7 @@ class MetadataDBService(ABC):
     which implements these function.
     """
     @abstractmethod
-    def __create_db_conn(self, host, dbname, user, password):
+    def create_db_conn(self, host, dbname, user, password):
         """
         creates a database objects to the underlying db
         """
@@ -101,7 +114,7 @@ class PostgresDBService(MetadataDBService):
         self.__password = os.environ['GLUE_POSTGRES_PASSWORD']
     
 
-    def __create_db_conn(self, host, dbname, user, password):
+    def create_db_conn(self, host, dbname, user, password):
         try: 
             conn = psycopg2.connect(f"host={host} dbname={dbname} user={user} password={password}")
         except psycopg2.Error as err: 
@@ -119,9 +132,9 @@ class PostgresDBService(MetadataDBService):
         """
         function to create the control table related db objects
         """
-        conn, cur = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+        conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
         try:
-            for query in create_queries:
+            for query in sq.create_queries:
                 cur.execute(query)
         except Exception as err:
             log.info("error executing query {}".format(query))
@@ -140,8 +153,8 @@ class PostgresDBService(MetadataDBService):
         """
         get all glue jobs from the 'jobs' table. This function return a pandas sql dataframe
         """
-        conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
-        sql = "select * from jobs;"
+        conn, _ = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+        sql = sq.select_from_jobs
         try: 
             df = sqlio.read_sql_query(sql, conn)
         except Exception as err: 
@@ -159,8 +172,7 @@ class PostgresDBService(MetadataDBService):
     def update_jobs_table(self):
         value = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
-        cur = conn.cursor()
+        conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
         
         sql = f"update job_control.jobs set last_run_timestamp = '{value}'"
         try:
@@ -182,8 +194,8 @@ class PostgresDBService(MetadataDBService):
         else:
             status = "in-progress"
 
-        conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
-        cur = conn.cursor()
+        conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+        
         sql = f"update public.job_instances set job_run_id = '{job_run_id}', status = '{status}' where job_name = '{job_name}' and job_instance = '{job_instance}'"
         try:
             cur.execute(sql)
@@ -218,10 +230,9 @@ class PostgresDBService(MetadataDBService):
 
     '''
     def get_job_status(self, job_name, job_instance):
-        conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
-        cur = conn.cursor()
-        
-        sql = f"select job_run_id, status from job_instances where job_name = '{job_name}' and job_instance = '{job_instance}'"
+        conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+                
+        sql = sq.select_from_job_instances.format(job_name, job_instance)
         try:
             cur.execute(sql)
             row = cur.fetchall()
@@ -237,10 +248,9 @@ class PostgresDBService(MetadataDBService):
         return row[0], row[1]
 
     def get_job_details(self, job_name, job_instance):
-        conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
-        cur = conn.cursor()
-        
-        sql = select_from_job_details.format(job_name, job_instance)
+        conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+                
+        sql = sq.select_from_job_details.format(job_name, job_instance)
         try:
             cur.execute(sql)
             rows = cur.fetchall()
@@ -607,7 +617,9 @@ def main():
     glue_instance =  GlueJobService()
     
     if args.userType == 'admin':
-        main_admin(args.maxDpu, postgres_instance, glue_instance)
+        # creates necessary db objects for job control
+        postgres_instance.create_postgres_db_objects()
+        # main_admin(args.maxDpu, postgres_instance, glue_instance)
     elif args.userType == 'user':
         main_user(args, postgres_instance, glue_instance)
     else:
