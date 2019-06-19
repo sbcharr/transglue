@@ -538,6 +538,11 @@ def sync_jobs(postgres_instance, glue_instance):
     df_temp = pd.merge(df_jobs_all, df_glue_jobs, left_on='job_name', right_on='job_name', how='outer', indicator=True)
     
     df_insert_recs = df_temp[(df_temp['_merge'] == 'left_only') & (df_temp['is_active'] == 'Y')]
+
+    # TODO: edge case: what if someone updates the jobs table during execution of a job? this will make modified_timestamp < last_run_timestamp
+    # and as a result the job will never update
+    # solution: make the update operation on jobs table async and it should only execute once that particular job is not running irrespective of when the 
+    # update request is submitted.
     df_update_recs = df_temp[(df_temp['_merge'] == 'both') & (df_temp['is_active'] == 'Y') & (df_temp['modified_timestamp'] > df_temp['last_run_timestamp'])]
     df_delete_recs = df_temp[(df_temp['_merge'] == 'both') & (df_temp['is_active'] != 'Y')]
     print(df_delete_recs)
@@ -588,7 +593,12 @@ def sync_jobs(postgres_instance, glue_instance):
 
 
 def main_admin(max_dpu, postgres_instance, glue_instance):
+    # creates necessary db objects to control various Glue jobs
     postgres_instance.create_postgres_db_objects()
+
+    # this job should be executed periodically as admin to sync 
+    # job information between control table and Glue*
+
     sync_jobs(postgres_instance, glue_instance)
 
 
@@ -643,8 +653,6 @@ def main():
     glue_instance =  GlueJobService()
     
     if args.userType == 'admin':
-        # creates necessary db objects for job control
-        # postgres_instance.create_postgres_db_objects()
         main_admin(args.maxDpu, postgres_instance, glue_instance)
     elif args.userType == 'user':
         main_user(args, postgres_instance, glue_instance)
