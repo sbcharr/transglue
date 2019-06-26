@@ -221,26 +221,26 @@ class PostgresDBService(MetadataDBService):
             log.info("successfully closed the db connection")
 
         log.info("column 'job_run_id' in 'job_instances' table is sucessfully updated")
-    '''
-    def update_job_details(self, job_name, job_instance, job_run_id):
-        conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
-        cur = conn.cursor()
+    
+    # def update_job_details(self, job_name, job_instance, job_run_id):
+    #     conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+    #     cur = conn.cursor()
         
-        sql = f"update public.job_details set job_run_id = '{job_run_id}' where job_name = '{job_name}' and job_instance = '{job_instance}'"
-        try:
-            cur.execute(sql)
-        except Exception as err:
-            log.info("update public.job_details ...")
-            log.error(err)
-            raise
-        finally:
-            cur.close()
-            conn.close()
-            log.info("successfully closed the db connection")
+    #     sql = f"update public.job_details set job_run_id = '{job_run_id}' where job_name = '{job_name}' and job_instance = '{job_instance}'"
+    #     try:
+    #         cur.execute(sql)
+    #     except Exception as err:
+    #         log.info("update public.job_details ...")
+    #         log.error(err)
+    #         raise
+    #     finally:
+    #         cur.close()
+    #         conn.close()
+    #         log.info("successfully closed the db connection")
 
-        log.info("column 'job_run_id' in 'job_details' table is sucessfully updated")
+    #     log.info("column 'job_run_id' in 'job_details' table is sucessfully updated")
 
-    '''
+
     def get_job_status(self, job_name, job_instance):
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
                 
@@ -440,83 +440,83 @@ class GlueJobService(AwsGlueService):
         return r['JobRun']['JobRunState'], r['JobRun']['ErrorMessage']
 
 
-class GlueCrawlerService(AwsGlueService):
-    def __init__(self):
-        AwsGlueService.__init__(self)
+# class GlueCrawlerService(AwsGlueService):
+#     def __init__(self):
+#         AwsGlueService.__init__(self)
 
-    def create_crawler_service(self, name, role, catalog_db_name, s3_target_path, description=None, table_prefix=None):
-        try:
-            # if  not self.is_crawler_available(name):
-            _ = self.client.create_crawler(
-                Name=name,
-                Role=role,
-                DatabaseName=catalog_db_name,
-                Description=description,
-                Targets={
-                    'S3Targets': [
-                        {
-                            'Path': s3_target_path
-                        }
-                    ]
-                },
-                SchemaChangePolicy={
-                    'UpdateBehavior': 'LOG',
-                    'DeleteBehavior': 'DEPRECATE_IN_DATABASE'
-                }
-            )
-            # else:
-            #    log.info(f"crawler {name} is already available")
-        except ClientError as e:
-            if e.response['Error']['Code'] == "AlreadyExistsException":
-                log.info(f"crawler {name} already exists")
-            else:
-                log.error(f"error: {e.response['Error']['Message']}")
-                raise
+#     def create_crawler_service(self, name, role, catalog_db_name, s3_target_path, description=None, table_prefix=None):
+#         try:
+#             # if  not self.is_crawler_available(name):
+#             _ = self.client.create_crawler(
+#                 Name=name,
+#                 Role=role,
+#                 DatabaseName=catalog_db_name,
+#                 Description=description,
+#                 Targets={
+#                     'S3Targets': [
+#                         {
+#                             'Path': s3_target_path
+#                         }
+#                     ]
+#                 },
+#                 SchemaChangePolicy={
+#                     'UpdateBehavior': 'LOG',
+#                     'DeleteBehavior': 'DEPRECATE_IN_DATABASE'
+#                 }
+#             )
+#             # else:
+#             #    log.info(f"crawler {name} is already available")
+#         except ClientError as e:
+#             if e.response['Error']['Code'] == "AlreadyExistsException":
+#                 log.info(f"crawler {name} already exists")
+#             else:
+#                 log.error(f"error: {e.response['Error']['Message']}")
+#                 raise
     
-    def start_glue_crawler(self, name):
-        try:
-            _ = self.client.start_crawler(
-                Name=name
-            )
-        except ClientError as e:
-            if e.response['Error']['Code'] == "CrawlerRunningException":
-                log.info(f"crawler {name} is already running, please run at a later time")
-            else:
-                log.error(f"error: {e.response['Error']['Message']}")
+#     def start_glue_crawler(self, name):
+#         try:
+#             _ = self.client.start_crawler(
+#                 Name=name
+#             )
+#         except ClientError as e:
+#             if e.response['Error']['Code'] == "CrawlerRunningException":
+#                 log.info(f"crawler {name} is already running, please run at a later time")
+#             else:
+#                 log.error(f"error: {e.response['Error']['Message']}")
         
-    def delete_glue_crawler(self, name):
-        try:
-            _ = self.client.delete_crawler(
-                    Name=name
-                )
-        except ClientError as e:
-            if e.response['Error']['Code'] == "CrawlerRunningException":
-                log.error(f"crawler {name} is currently running, try again later")
-                raise
-            else:
-                log.error(f"error: {e.response['Error']['Message']}")
-                raise
+#     def delete_glue_crawler(self, name):
+#         try:
+#             _ = self.client.delete_crawler(
+#                     Name=name
+#                 )
+#         except ClientError as e:
+#             if e.response['Error']['Code'] == "CrawlerRunningException":
+#                 log.error(f"crawler {name} is currently running, try again later")
+#                 raise
+#             else:
+#                 log.error(f"error: {e.response['Error']['Message']}")
+#                 raise
 
-class GlueCatalogService(AwsGlueService):
-    def __init__(self):
-        AwsGlueService.__init__(self)
+# class GlueCatalogService(AwsGlueService):
+#     def __init__(self):
+#         AwsGlueService.__init__(self)
 
-    def create_database_in_catalog(self, name, catalog_id=None, description=None, location_uri=None):
-        try:  
-            _ = self.client.create_database(
-                CatalogId=catalog_id,
-                DatabaseInput={
-                    'Name': name,
-                    'Description': description,
-                    'LocationUri': location_uri
-                }
-            )
-        except ClientError as e:
-            if e.response['Error']['Code'] == "AlreadyExistsException":
-                log.info(f"database {name} already exists in catalog {catalog_id}")
-        except ClientError as e:
-            log.error(f"error: {e.response['Error']['Message']}")
-            raise
+#     def create_database_in_catalog(self, name, catalog_id=None, description=None, location_uri=None):
+#         try:  
+#             _ = self.client.create_database(
+#                 CatalogId=catalog_id,
+#                 DatabaseInput={
+#                     'Name': name,
+#                     'Description': description,
+#                     'LocationUri': location_uri
+#                 }
+#             )
+#         except ClientError as e:
+#             if e.response['Error']['Code'] == "AlreadyExistsException":
+#                 log.info(f"database {name} already exists in catalog {catalog_id}")
+#         except ClientError as e:
+#             log.error(f"error: {e.response['Error']['Message']}")
+#             raise
 
 
 def sync_jobs(postgres_instance, glue_instance):
