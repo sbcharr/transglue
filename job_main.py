@@ -1,6 +1,5 @@
 import logging as log
 import time
-import base64
 import pandas as pd
 from datetime import datetime
 from commons import commons as c
@@ -33,7 +32,7 @@ def sync_jobs(job_instance, postgres_instance, glue_instance):
     # is not running irrespective of when the update request is submitted.
 
     df_update_recs = df_temp[(df_temp['_merge'] == 'both') & (df_temp['is_active'] == 'Y') &
-                             (df_temp['modified_timestamp'] > df_temp['last_run_timestamp'])]
+                             (df_temp['modified_timestamp'] > df_temp['last_sync_timestamp'])]
 
     df_delete_recs = df_temp[(df_temp['_merge'] == 'both') & (df_temp['is_active'] != 'Y')]
     # print(df_delete_recs)
@@ -41,14 +40,14 @@ def sync_jobs(job_instance, postgres_instance, glue_instance):
 
     # delete operation to delete any inactive job
     for _, row in df_delete_recs.iterrows():
-        log.info(f"deleting job {row['job_name']}...")
+        log.info("deleting job {}...".format(row['job_name']))
         glue_instance.delete_glue_job(row['job_name'])
 
     # TODO: edge case: Check whether delete operator deletes a running instance of the job or not
 
     # create operation to create any new job that is inserted in Postgres db
     for _, row in df_insert_recs.iterrows():
-        log.info(f"creating job {row['job_name']}...")
+        log.info("creating job {}...".format(row['job_name']))
         glue_instance.create_glue_job(
             row['job_name'],
             row['job_description'],
@@ -64,7 +63,7 @@ def sync_jobs(job_instance, postgres_instance, glue_instance):
 
     # update any existing job whose definition has been changed recently in Postgres db
     for _, row in df_update_recs.iterrows():
-        log.info(f"updating job {row['job_name']}...")
+        log.info("updating job {}...".format(row['job_name']))
         glue_instance.update_glue_job(
             row['job_name'],
             row['job_description'],
@@ -79,7 +78,7 @@ def sync_jobs(job_instance, postgres_instance, glue_instance):
 
     postgres_instance.update_jobs_table()
 
-    log.info("successfully synchronized jobs between database and AWS Glue at {}".format(datetime.now()))
+    log.info("successfully synchronized jobs between database and AWS Glue")
 
 
 def main_admin(job_name, job_instance, postgres_instance, glue_instance, sqs_instance):
@@ -90,18 +89,20 @@ def main_admin(job_name, job_instance, postgres_instance, glue_instance, sqs_ins
     sync_jobs(job_instance, postgres_instance, glue_instance)
 
     # For SQS FIFO
-    encoded_queue_name = base64.b64encode(job_name + "#" + job_instance) + ".fifo"
+    queue_name = job_name + "_" + job_instance + ".fifo"
 
-    queue_url = sqs_instance.sqs_client.get_queue_url(
-        QueueName=encoded_queue_name,
-    )
-    sqs_queue_url = queue_url['QueueUrl']
+    queue_url = sqs_instance.get_queue_url(queue_name)
 
-    # deletes the existing queue
-    sqs_instance.delete_fifo_queue(sqs_queue_url)
+    if queue_url:
+        sqs_queue_url = queue_url['QueueUrl']
+
+        # deletes the existing queue
+        sqs_instance.delete_fifo_queue(sqs_queue_url)
+        log.info("deleted fifo queue {}".format(queue_name))
 
     # creates sqs fifo queue
-    sqs_instance.create_fifo_queue(encoded_queue_name)
+    sqs_instance.create_fifo_queue(queue_name)
+    log.info("created fifo queue {}".format(queue_name))
 
 
 def main_user(job_name, job_instance, max_dpu, postgres_instance, glue_instance):

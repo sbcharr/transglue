@@ -32,7 +32,7 @@ create_table_job_details = "CREATE TABLE IF NOT EXISTS job_details ( \
     job_instance int NOT NULL, \
     table_name text, \
     created_timestamp timestamp DEFAULT now(), \
-    last_run_timestamp timestamp, \
+    last_run_timestamp timestamp DEFAULT '1970-01-01 00:00:00' NOT NULL, \
     PRIMARY KEY (job_name, job_instance, table_name), \
     FOREIGN KEY (job_name, job_instance) REFERENCES job_instances (job_name, job_instance) \
 );"
@@ -40,12 +40,26 @@ create_table_job_details = "CREATE TABLE IF NOT EXISTS job_details ( \
 use_schema = "SET search_path TO job_control_admin;"
 
 select_from_jobs = "select jobs.* from jobs join job_instances j on jobs.job_name = j.job_name" \
-                   "where j.job_instance = '{}';"
+                   " where j.job_instance = '{}';"
 select_from_job_instances = "select job_run_id, status from job_instances where job_name = '{}' \
                             and job_instance = '{}';"
 select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = '{}'"
 
-update_table_jobs = "update jobs set last_run_timestamp = '{}' where is_active = 'Y'"
+insert_into_jobs = "insert into jobs(job_name, job_description, log_uri, role_arn, max_concurrent_runs, \
+                script_location, max_retries, timeout_minutes, max_capacity, notify_delay_after, tags, \
+                is_active) values('test-job-nycitytaxi-01', 'nycitytaxi test job', null, \
+                'arn:aws:iam::350072545445:role/role_glues3redshift', 2, \
+                's3://sb-glue-etl-scripts/scripts/el_nycitytaxi_to_dl.py', 1, 20, 2, null, 'data-engineering', 'Y');"
+
+insert_into_job_instances = "insert into job_instances (job_name, job_instance) values('test-job-nycitytaxi-01', 1);"
+
+insert_into_job_details_01 = "insert into job_details (job_name, job_instance, table_name) \
+                            values('test-job-nycitytaxi-01', 1, 'job_control_admin.green_taxi');"
+
+insert_into_job_details_02 = "insert into job_details (job_name, job_instance, table_name) \
+                            values('test-job-nycitytaxi-01', 1, 'job_control_admin.fhv');"
+
+update_table_jobs = "update jobs set last_sync_timestamp = '{}' where is_active = 'Y'"
 update_table_job_instances = "update job_instances set job_run_id = '{}', status = '{}' where job_name = '{}' \
                             and job_instance = '{}"
 update_table_job_details = "update job_details set last_run_timestamp = '{}' where job_name = '{}' \

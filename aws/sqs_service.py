@@ -2,12 +2,13 @@ import boto3
 from botocore.exceptions import ClientError
 import logging as log
 from commons import commons as c
+import time
 
 
 class AwsSqsService:
     def __init__(self):
         self.sqs_client = boto3.client('sqs', region_name=c.os.environ['REGION_NAME'],
-                                       aws_access_key_id=c.os.environ['AWS_SECRET_ACCESS_KEY'],
+                                       aws_access_key_id=c.os.environ['AWS_ACCESS_KEY_ID'],
                                        aws_secret_access_key=c.os.environ['AWS_SECRET_ACCESS_KEY'])
 
     def create_fifo_queue(self, queue_name):
@@ -15,8 +16,8 @@ class AwsSqsService:
             _ = self.sqs_client.create_queue(
                 QueueName=queue_name,
                 Attributes={
-                    'MessageRetentionPeriod': 43200,
-                    'FifoQueue': True,
+                    'MessageRetentionPeriod': '43200',
+                    'FifoQueue': 'true',
                 })
         except ClientError as e:
             log.error("error creating sqs fifo queue {}: {}".format(queue_name, e.response['Error']['Message']))
@@ -56,9 +57,15 @@ class AwsSqsService:
         return msgs['Messages']
 
     def delete_fifo_queue(self, queue_url):
-        _ = self.sqs_client.delete_queue(
-            QueueUrl=queue_url
-        )
+        try:
+            _ = self.sqs_client.delete_queue(
+                QueueUrl=queue_url
+            )
+        except ClientError as e:
+            log.error(e.response['Error']['Message'])
+            return
+        log.info("deleting queue {}, wait for 60 seconds".format(queue_url))
+        time.sleep(61)    # as per aws queue deletion may take up to 60 secs
 
     def delete_sqs_message(self, sqs_queue_url, msg_receipt_handle):
         """Delete a message from an SQS queue
@@ -70,3 +77,18 @@ class AwsSqsService:
         # Delete the message from the SQS queue
         self.sqs_client.delete_message(QueueUrl=sqs_queue_url,
                                        ReceiptHandle=msg_receipt_handle)
+
+    def get_queue_url(self, queue_name):
+        try:
+            queue_url = self.sqs_client.get_queue_url(
+                QueueName=queue_name,
+            )
+        except ClientError as e:
+            if e.response['Error']['Code'] == "AWS.SimpleQueueService.NonExistentQueue":
+                log.info("fifo queue {} does not exist".format(queue_name))
+                return
+            else:
+                log.error(e)
+                raise
+
+        return queue_url

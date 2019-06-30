@@ -29,7 +29,7 @@ def flag_parser():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--jobName", help="(optional for admin) job name to execute")
-    parser.add_argument("--jobInstance", help="(optional for admin) sequence number of job instance")
+    parser.add_argument("--jobInstance", help="sequence number of job instance")
     parser.add_argument("--userType", help="user who runs this job, one of 'admin' or 'user'")
     parser.add_argument("--maxDpu", help="(optional) max dpu that AWS Glue uses, available only with user type 'user'")
     parser.add_argument("--logLevel", help="(optional) log level, values are 'debug', 'info', \
@@ -40,7 +40,7 @@ def flag_parser():
     return args
 
 
-def set_logger(log_level):
+def set_logger(log_level=log.INFO):
     """
     Main logger set for the program. Default log level is set to INFO.
     """

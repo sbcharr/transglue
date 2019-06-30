@@ -6,7 +6,7 @@ from commons import commons as c
 
 class AwsGlueService:
     def __init__(self):
-        self.client = boto3.client('aws', region_name=c.os.environ['REGION_NAME'],
+        self.client = boto3.client('glue', region_name=c.os.environ['REGION_NAME'],
                                    aws_access_key_id=c.os.environ['AWS_ACCESS_KEY_ID'],
                                    aws_secret_access_key=c.os.environ['AWS_SECRET_ACCESS_KEY'])
 
@@ -58,10 +58,10 @@ class GlueJobService(AwsGlueService):
                         },
                 MaxRetries=int(max_retries),
                 Timeout=int(timeout),
-                MaxCapacity=max_capacity,
-                Tags={
-                    'key': tags
-                }
+                AllocatedCapacity=int(max_capacity),
+                # Tags={
+                #     'key': tags
+                # }
             )
         except Exception as err:
             log.error(err)
@@ -94,14 +94,14 @@ class GlueJobService(AwsGlueService):
                     },
                     'MaxRetries': int(max_retries),
                     'Timeout': int(timeout),
-                    'MaxCapacity': max_capacity
+                    'AllocatedCapacity': int(max_capacity)
                 }
             )
         except ClientError as e:
             log.error(e)
             raise
 
-        log.info(f"aws job {job_name} is successfully updated")
+        log.info("aws job {} is successfully updated".format(job_name))
 
     def delete_glue_job(self, job_name):
         print(job_name)

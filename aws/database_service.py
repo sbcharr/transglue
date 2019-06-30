@@ -2,62 +2,61 @@ from datetime import datetime
 import logging as log
 import psycopg2
 import pandas.io.sql as sqlio
-from abc import (
-    ABC,
-    abstractmethod,
-)
+import abc
 from aws.sql import sql_queries as sq
 from commons import commons as c
 
 
-class MetadataDBService(ABC):
+class MetadataDBService:
     """
     MetadataDBService is an abstract class which defines the various signatures for classes
     which implements these function.
     """
-    @abstractmethod
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
     def create_db_conn(self, host, dbname, user, password):
         """
         creates a database objects to the underlying db
         """
         pass
 
-    @abstractmethod
+    @abc.abstractmethod
     def get_glue_jobs_from_db(self, job_instance):
         """
         this is responsible to get all related glue jobs from AWS Glue service.
         """
         pass
 
-    @abstractmethod
+    @abc.abstractmethod
     def get_job_status(self, job_name, job_instance):
         """
         this function retrieves job status from metadata db.
         """
         pass
 
-    @abstractmethod
+    @abc.abstractmethod
     def get_job_details(self, job_name, job_instance):
         """
         this function retrieves job details from metadata db.
         """
         pass
 
-    @abstractmethod
+    @abc.abstractmethod
     def update_jobs_table(self):
         """
         this function updates the control table called 'jobs' in metadata db.
         """
         pass
 
-    @abstractmethod
+    @abc.abstractmethod
     def update_job_instance(self, job_name, job_instance, job_run_id, job_status_ctx):
         """
         this function updates the control table called 'jobs_instances' in metadata db.
         """
         pass
 
-    @abstractmethod
+    @abc.abstractmethod
     def copy_to_database(self, target_table, temp_s3_bucket, iam_role):
         """
 
@@ -65,7 +64,7 @@ class MetadataDBService(ABC):
         """
         pass
 
-    @abstractmethod
+    @abc.abstractmethod
     def update_job_details(self, job_name, job_instance, table):
         """
 
@@ -123,7 +122,7 @@ class PostgresDBService(MetadataDBService):
         get all glue jobs from the 'jobs' table. This function returns a pandas sql data frame
         """
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
-        sql_stmt = sq.select_from_jobs
+        sql_stmt = sq.select_from_jobs.format(int(job_instance))
 
         try:
             cur.execute(sq.use_schema)
