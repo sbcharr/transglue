@@ -251,7 +251,8 @@ class PostgresDBService(MetadataDBService):
 
     def copy_to_database(self, target_table, temp_s3_bucket, iam_role):
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
-        sql_stmt = sq.load_data_to_table.format(target_table, temp_s3_bucket, iam_role)
+        s3_path = "s3://{}/data/{}/parquet/".format(temp_s3_bucket, target_table)
+        sql_stmt = sq.load_data_to_table.format(target_table, s3_path, iam_role)
 
         try:
             cur.execute(sql_stmt)
