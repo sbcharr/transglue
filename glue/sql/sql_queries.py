@@ -39,7 +39,8 @@ create_table_job_details = "CREATE TABLE IF NOT EXISTS job_details ( \
 
 use_schema = "SET search_path TO job_control_admin;"
 
-select_from_jobs = "select * from jobs;"
+select_from_jobs = "select jobs.* from jobs join job_instances j on jobs.job_name = j.job_name" \
+                   "where j.job_instance = '{}';"
 select_from_job_instances = "select job_run_id, status from job_instances where job_name = '{}' \
                             and job_instance = '{}';"
 select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = '{}'"

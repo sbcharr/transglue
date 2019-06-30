@@ -72,7 +72,7 @@ class MetadataDBService(ABC):
         pass
     
     @abstractmethod
-    def get_glue_jobs_from_db(self):
+    def get_glue_jobs_from_db(self, job_instance):
         """
         this is responsible to get all related glue jobs from AWS Glue service.
         """
@@ -151,7 +151,7 @@ class PostgresDBService(MetadataDBService):
 
         log.info("successfully created all necessary control schema objects")
 
-    def get_glue_jobs_from_db(self):
+    def get_glue_jobs_from_db(self, job_instance):
         """
         get all glue jobs from the 'jobs' table. This function returns a pandas sql data frame
         """
@@ -159,7 +159,7 @@ class PostgresDBService(MetadataDBService):
         query = sq.select_from_jobs
         try: 
             cur.execute(sq.use_schema)
-            df = sqlio.read_sql_query(query, conn)
+            df = sqlio.read_sql_query(query.format(job_instance), conn)
         except Exception as e:
             log.info("Error: select *")
             log.error(e)
@@ -215,7 +215,7 @@ class PostgresDBService(MetadataDBService):
             conn.close()
             log.info("successfully closed the db connection")
 
-        log.info("column 'job_run_id' in 'job_instances' table is sucessfully updated")
+        log.info("column 'job_run_id' in 'job_instances' table is successfully updated")
     
     # def update_job_details(self, job_name, job_instance, job_run_id):
     #     conn = self.__create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
@@ -238,10 +238,10 @@ class PostgresDBService(MetadataDBService):
     def get_job_status(self, job_name, job_instance):
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
                 
-        sql = sq.select_from_job_instances.format(job_name, job_instance)
+        query = sq.select_from_job_instances.format(job_name, job_instance)
         try:
             cur.execute(sq.use_schema)
-            cur.execute(sql)
+            cur.execute(query)
             row = cur.fetchall()
         except Exception as err:
             log.info("select job_instances ...")
@@ -426,10 +426,12 @@ class GlueJobService(AwsGlueService):
         try:
             r = self.client.get_job_run(JobName=job_name, RunId=job_run_id, PredecessorsIncluded=False)
         except ClientError as e:
-            log.error(e)
+            log.error("job {} with job run id {} is failed with error {}".format(job_name,
+                                                                                 job_run_id,
+                                                                                 r['JobRun']['ErrorMessage']))
             raise
 
-        return r['JobRun']['JobRunState'], r['JobRun']['ErrorMessage']
+        return r['JobRun']['JobRunState']
 
 
 # class GlueCrawlerService(AwsGlueService):
@@ -512,20 +514,20 @@ class GlueJobService(AwsGlueService):
 #             raise
 
 
-def sync_jobs(postgres_instance, glue_instance):
+def sync_jobs(job_instance, postgres_instance, glue_instance):
     '''sync_job runs as a separate job on a periodic basic to sync up job info between Postgres
     db and AWS Glue. It receives a postgres instance and a glue instance as its parameters. Sync
     job should be executed by an Admin user.
     '''
 
-    # Get all glue jobs from Postgres db
-    df_jobs_all = postgres_instance.get_glue_jobs_from_db()
+    # Get all relevant glue jobs from Postgres db
+    df_jobs_all = postgres_instance.get_glue_jobs_from_db(job_instance)
     if df_jobs_all.shape[0] == 0:
         log.info("empty jobs table, exiting function...")
         return
     
     # get_glue_jobs returns all job names from AWS Glue as a list
-    df_glue_jobs = pd.DataFrame(glue_instance.get_glue_jobs(), columns=['job_name'])  
+    df_glue_jobs = pd.DataFrame(glue_instance.get_glue_jobs(), columns=['job_name'])
     print(df_glue_jobs)
     # pandas data frame is used to identify jobs that are to be created, updated and deleted in AWS Glue Service
     df_temp = pd.merge(df_jobs_all, df_glue_jobs, left_on='job_name', right_on='job_name', how='outer', indicator=True)
@@ -587,52 +589,37 @@ def sync_jobs(postgres_instance, glue_instance):
     log.info("successfully synchronized jobs between database and AWS Glue at {}".format(datetime.now()))
 
 
-def main_admin(max_dpu, postgres_instance, glue_instance):
+def main_admin(job_instance, postgres_instance, glue_instance):
     # creates necessary db objects to control various Glue jobs
     postgres_instance.create_postgres_db_objects()
-
-    # this job should be executed periodically as admin to sync 
-    # job information between control table and Glue*
-
-    sync_jobs(postgres_instance, glue_instance)
+    sync_jobs(job_instance, postgres_instance, glue_instance)
 
 
-def main_user(args, postgres_instance, glue_instance):
-    job_name = args.jobName
-    job_instance = args.jobInstance
-    max_dpu = args.maxDpu
+def main_user(job_name, job_instance, max_dpu, postgres_instance, glue_instance):
 
     # get job run id and status of previous job before running a new instance. This is to ensure
     # that previous job has completed.
     job_run_id, status = postgres_instance.get_job_status(job_name, job_instance)
     if status != 'completed':
         while True:
-            job_status, err = glue_instance.get_glue_job_status(job_run_id)
-            print(err)
-            if err != None:
-                log.error(f"job {job_name} with job run id {job_run_id} is failed with error {err}")
-                break
+            job_status = glue_instance.get_glue_job_status(job_run_id)
 
             if job_status == 'SUCCEEDED':
-                log.info(f"job {job_name} with job run id {job_run_id} is successfully completed")
+                log.info("job {} with job run id {} is successfully completed".format(job_name, job_run_id))
                 break
             time.sleep(20)
-        # update control table with job status, either in-progress or completed
-        postgres_instance.update_job_instance(job_name, job_instance, job_run_id, ctx=0)
 
-    tables = postgres_instance.get_job_details(job_name, job_instance)
-    job_run_id = glue_instance.start_glue_job(job_name, job_instance, max_dpu, tables)
-    postgres_instance.update_job_instance(job_name, job_instance, job_run_id)
+        # update control table with job status, either in-progress or completed
+        postgres_instance.update_job_instance(job_name, job_instance, job_run_id, job_status_ctx=0)
+
+    target_tables = postgres_instance.get_job_details(job_name, job_instance)
+    job_run_id = glue_instance.start_glue_job(job_name, job_instance, max_dpu, target_tables)
+    postgres_instance.update_job_instance(job_name, job_instance, job_run_id, job_status_ctx=1)
 
     while True:
-        job_status, err = glue_instance.get_glue_job_status(job_run_id)
-        # print(err)
-        if err != None:
-            log.error(f"job {job_name} with job run id {job_run_id} is failed with error {err}")
-            break
-
+        job_status = glue_instance.get_glue_job_status(job_run_id)
         if job_status == 'SUCCEEDED':
-            log.info(f"job {job_name} with job run id {job_run_id} is successfully completed")
+            log.info("job {} with job run id {} is successfully completed".format(job_name, job_run_id))
             break
         time.sleep(20)
 
@@ -649,9 +636,9 @@ def main():
     glue_instance = GlueJobService()
     
     if args.userType == 'admin':
-        main_admin(args.maxDpu, postgres_instance, glue_instance)
+        main_admin(args.jobInstance, postgres_instance, glue_instance)
     elif args.userType == 'user':
-        main_user(args, postgres_instance, glue_instance)
+        main_user(args.jobName, args.jobInstance, args.maxDpu, postgres_instance, glue_instance)
     else:
         raise ValueError("invalid --userType, type -h for help")
 
