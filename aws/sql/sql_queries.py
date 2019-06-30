@@ -46,8 +46,13 @@ select_from_job_instances = "select job_run_id, status from job_instances where 
 select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = '{}'"
 
 update_table_jobs = "update jobs set last_run_timestamp = '{}' where is_active = 'Y'"
-update_table_job_instances = "update public.job_instances set job_run_id = '{}', status = '{}' where job_name = '{}' \
+update_table_job_instances = "update job_instances set job_run_id = '{}', status = '{}' where job_name = '{}' \
                             and job_instance = '{}"
+update_table_job_details = "update job_details set last_run_timestamp = '{}' where job_name = '{}' \
+                            and job_instance = '{}' and table_name = '{}'"
 
-create_queries = [create_control_schema, use_schema, create_table_jobs,
-                  create_table_job_instances, create_table_job_details]
+load_data_to_table = "copy {} from '{}' iam_role '{}' format as parquet;"
+
+create_sql_stmts = [create_control_schema, use_schema, create_table_jobs,
+                    create_table_job_instances, create_table_job_details]
+
