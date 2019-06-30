@@ -45,21 +45,8 @@ select_from_job_instances = "select job_run_id, status from job_instances where 
                             and job_instance = '{}';"
 select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = '{}'"
 
-insert_into_jobs = "insert into jobs(job_name, job_description, log_uri, role_arn, max_concurrent_runs, \
-                script_location, max_retries, timeout_minutes, max_capacity, notify_delay_after, tags, \
-                is_active) values('test-job-nycitytaxi-01', 'nycitytaxi test job', null, \
-                'arn:aws:iam::350072545445:role/role_glues3redshift', 2, \
-                's3://sb-glue-etl-scripts/scripts/el_nycitytaxi_to_dl.py', 1, 20, 2, null, 'data-engineering', 'Y');"
-
-insert_into_job_instances = "insert into job_instances (job_name, job_instance) values('test-job-nycitytaxi-01', 1);"
-
-insert_into_job_details_01 = "insert into job_details (job_name, job_instance, table_name) \
-                            values('test-job-nycitytaxi-01', 1, 'job_control_admin.green_taxi');"
-
-insert_into_job_details_02 = "insert into job_details (job_name, job_instance, table_name) \
-                            values('test-job-nycitytaxi-01', 1, 'job_control_admin.fhv');"
-
 update_table_jobs = "update jobs set last_sync_timestamp = '{}' where is_active = 'Y'"
+
 update_table_job_instances = "update job_instances set job_run_id = '{}', status = '{}' where job_name = '{}' \
                             and job_instance = '{}"
 update_table_job_details = "update job_details set last_run_timestamp = '{}' where job_name = '{}' \
