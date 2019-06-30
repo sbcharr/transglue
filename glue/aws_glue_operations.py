@@ -2,7 +2,7 @@ import boto3
 from botocore.exceptions import ClientError
 import logging as log
 import configparser
-import argparse, os, sys, time
+import argparse, os, time
 import psycopg2
 import pandas as pd
 import pandas.io.sql as sqlio
@@ -11,7 +11,7 @@ from abc import (
     ABC, 
     abstractmethod,
 )
-import sql_queries as sq
+from glue.sql import sql_queries as sq
 
 
 config = configparser.ConfigParser()
@@ -27,8 +27,6 @@ os.environ['AWS_SECRET_ACCESS_KEY']=config['aws-creds']['aws_secret_access_key']
 os.environ['REGION_NAME']=config['aws-creds']['region_name']
 
 
-
-
 def flag_parser():
     """
     A function to parse parameterized input to command line arguments. It returns the object
@@ -39,11 +37,13 @@ def flag_parser():
     parser.add_argument("--jobInstance", help="(optional for admin) sequence number of job instance")
     parser.add_argument("--userType", help="user who runs this job, one of 'admin' or 'user'")
     parser.add_argument("--maxDpu", help="(optional) max dpu that AWS Glue uses, available only with user type 'user'")
-    parser.add_argument("--logLevel", help="(optional) log level, values are 'debug', 'info', 'warning', 'error', 'critical'")
+    parser.add_argument("--logLevel", help="(optional) log level, values are 'debug', 'info', \
+                                           'warning', 'error', 'critical'")
 
     args = parser.parse_args()
 
     return args
+
 
 def set_logger(log_level):
     """
@@ -95,17 +95,16 @@ class MetadataDBService(ABC):
     @abstractmethod
     def get_job_status(self, job_name, job_instance):
         """
-        this function retrives job status from metadata db.
+        this function retrieves job status from metadata db.
         """
         pass
 
     @abstractmethod
     def get_job_details(self, job_name, job_instance):
         """
-        this function retrives job details from metadata db.
+        this function retrieves job details from metadata db.
         """
         pass
-
 
 
 class PostgresDBService(MetadataDBService):
@@ -118,11 +117,10 @@ class PostgresDBService(MetadataDBService):
         self.__dbname = os.environ['GLUE_JOBS_DB']
         self.__user = os.environ['GLUE_POSTGRES_USER']
         self.__password = os.environ['GLUE_POSTGRES_PASSWORD']
-    
 
     def create_db_conn(self, host, dbname, user, password):
         try: 
-            conn = psycopg2.connect(f"host={host} dbname={dbname} user={user} password={password}")
+            conn = psycopg2.connect("host={} dbname={} user={} password={}".format(host, dbname, user, password))
         except psycopg2.Error as err: 
             log.info("Error: Could not make connection to the Postgres database")
             log.error(err)
@@ -142,31 +140,29 @@ class PostgresDBService(MetadataDBService):
         try:
             for query in sq.create_queries:
                 cur.execute(query)
-        except Exception as err:
+        except Exception as e:
             log.info("error executing query {}".format(query))
-            log.error(err)
+            log.error(e)
             raise
         finally:
             cur.close()
             conn.close()
             log.info("successfully closed the db connection")
 
-        log.info("sucessfully created all necessary control schema objects")
-
-    
+        log.info("successfully created all necessary control schema objects")
 
     def get_glue_jobs_from_db(self):
         """
-        get all glue jobs from the 'jobs' table. This function return a pandas sql dataframe
+        get all glue jobs from the 'jobs' table. This function returns a pandas sql data frame
         """
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
-        sql = sq.select_from_jobs
+        query = sq.select_from_jobs
         try: 
             cur.execute(sq.use_schema)
-            df = sqlio.read_sql_query(sql, conn)
-        except Exception as err: 
+            df = sqlio.read_sql_query(query, conn)
+        except Exception as e:
             log.info("Error: select *")
-            log.error(err)
+            log.error(e)
             raise
         finally:
             cur.close()
@@ -184,10 +180,10 @@ class PostgresDBService(MetadataDBService):
 
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
         
-        sql = sq.update_table_jobs.format(value)
+        query = sq.update_table_jobs.format(value)
         try:
             cur.execute(sq.use_schema)
-            cur.execute(sql)
+            cur.execute(query)
         except Exception as err:
             log.info("update public.jobs ...")
             log.error(err)
@@ -197,7 +193,7 @@ class PostgresDBService(MetadataDBService):
             conn.close()
             log.info("successfully closed the db connection")
 
-        log.info("column 'last_run_timestamp' in 'jobs' table is sucessfully updated")
+        log.info("column 'last_run_timestamp' in 'jobs' table is successfully updated")
 
     def update_job_instance(self, job_name, job_instance, job_run_id, job_status_ctx=1):
         if job_status_ctx == 0:
@@ -206,14 +202,13 @@ class PostgresDBService(MetadataDBService):
             status = "in-progress"
 
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
-        
-        sql = f"update public.job_instances set job_run_id = '{job_run_id}', status = '{status}' where job_name = '{job_name}' and job_instance = '{job_instance}'"
+
         try:
             cur.execute(sq.use_schema)
-            cur.execute(sql)
-        except Exception as err:
+            cur.execute(sq.update_table_job_instances.format(job_run_id, status, job_name, job_instance))
+        except Exception as e:
             log.info("update public.job_instances ...")
-            log.error(err)
+            log.error(e)
             raise
         finally:
             cur.close()
@@ -239,7 +234,6 @@ class PostgresDBService(MetadataDBService):
     #         log.info("successfully closed the db connection")
 
     #     log.info("column 'job_run_id' in 'job_details' table is sucessfully updated")
-
 
     def get_job_status(self, job_name, job_instance):
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
@@ -286,7 +280,9 @@ class PostgresDBService(MetadataDBService):
         
 class AwsGlueService:
     def __init__(self):
-        self.client = boto3.client('glue', region_name = os.environ['REGION_NAME'], aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'], aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'])
+        self.client = boto3.client('glue', region_name = os.environ['REGION_NAME'],
+                                   aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+                                   aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'])
 
 
 class GlueJobService(AwsGlueService):
@@ -306,12 +302,11 @@ class GlueJobService(AwsGlueService):
                     next_token = r['NextToken']
                 else:
                     is_run = 1
-        except Exception as err:
-            log.error(err)
+        except ClientError as e:
+            log.error(e)
             raise
        
         return jobs
-
 
     def create_glue_job(self, 
                         job_name, 
@@ -319,7 +314,7 @@ class GlueJobService(AwsGlueService):
                         role, 
                         script_loc, 
                         tags,
-                        command_name='glueetl', 
+                        command_name='glueetl',
                         max_concurrent_runs=3, 
                         max_retries=1, 
                         timeout=180, 
@@ -333,7 +328,7 @@ class GlueJobService(AwsGlueService):
                     'MaxConcurrentRuns': int(max_concurrent_runs),
                 },
                 Command={'Name': command_name,
-                        'ScriptLocation': script_loc
+                         'ScriptLocation': script_loc
                         },
                 MaxRetries=int(max_retries),
                 Timeout=int(timeout),
@@ -346,9 +341,8 @@ class GlueJobService(AwsGlueService):
             log.error(err)
             raise
 
-        log.info(f"glue job {job_name} is successfully created")
-   
-  
+        log.info("glue job {} is successfully created".format(job_name))
+
     def update_glue_job(self,     
                         job_name,
                         description, 
@@ -377,12 +371,11 @@ class GlueJobService(AwsGlueService):
                     'MaxCapacity': max_capacity
                 }
             )
-        except Exception as err:
-            log.error(err)
+        except ClientError as e:
+            log.error(e)
             raise
 
         log.info(f"glue job {job_name} is successfully updated")
-
 
     def delete_glue_job(self, job_name):
         print(job_name)
@@ -390,14 +383,13 @@ class GlueJobService(AwsGlueService):
             r = self.client.delete_job(
                 JobName=job_name
             )
-        except Exception as err:
-            log.error(err)
+        except ClientError as e:
+            log.error(e)
             raise
 
         print(r['JobName'])
 
-        log.info(f"glue job {job_name} is successfully deleted")
-
+        log.info("glue job {} is successfully deleted".format(job_name))
 
     def start_glue_job(self, job_name, job_instance, tables, max_dpu=None):
         if max_dpu is not None:
@@ -410,8 +402,8 @@ class GlueJobService(AwsGlueService):
                     },
                     MaxCapacity=max_dpu
                 )
-            except Exception as err:
-                log.error(err)
+            except ClientError as e:
+                log.error(e)
                 raise
         else:
             try:
@@ -422,19 +414,19 @@ class GlueJobService(AwsGlueService):
                         '--tables': tables
                     }
                 )
-            except Exception as err:
-                log.error(err)
+            except ClientError as e:
+                log.error(e)
                 raise
 
-        log.info(f"glue job {job_name} is successfully started with job id {r['JobRunId']}")
+        log.info("glue job {} is successfully started with job id {}".format(job_name, r['JobRunId']))
 
         return r['JobRunId']
 
     def get_glue_job_status(self, job_name, job_run_id):
         try:
             r = self.client.get_job_run(JobName=job_name, RunId=job_run_id, PredecessorsIncluded=False)
-        except Exception as err:
-            log.error(err)
+        except ClientError as e:
+            log.error(e)
             raise
 
         return r['JobRun']['JobRunState'], r['JobRun']['ErrorMessage']
@@ -444,7 +436,8 @@ class GlueJobService(AwsGlueService):
 #     def __init__(self):
 #         AwsGlueService.__init__(self)
 
-#     def create_crawler_service(self, name, role, catalog_db_name, s3_target_path, description=None, table_prefix=None):
+#     def create_crawler_service(self, name, role, catalog_db_name, s3_target_path,
+#                                description=None, table_prefix=None):
 #         try:
 #             # if  not self.is_crawler_available(name):
 #             _ = self.client.create_crawler(
@@ -531,21 +524,24 @@ def sync_jobs(postgres_instance, glue_instance):
         log.info("empty jobs table, exiting function...")
         return
     
-    # get_glue_jobs retuns all job names from AWS Glue as a list
+    # get_glue_jobs returns all job names from AWS Glue as a list
     df_glue_jobs = pd.DataFrame(glue_instance.get_glue_jobs(), columns=['job_name'])  
     print(df_glue_jobs)
-    # pandas dataframe is used to identify jobs that are to be created, updated and deleted in AWS Glue Service
+    # pandas data frame is used to identify jobs that are to be created, updated and deleted in AWS Glue Service
     df_temp = pd.merge(df_jobs_all, df_glue_jobs, left_on='job_name', right_on='job_name', how='outer', indicator=True)
     
     df_insert_recs = df_temp[(df_temp['_merge'] == 'left_only') & (df_temp['is_active'] == 'Y')]
 
-    # TODO: edge case: what if someone updates the jobs table during execution of a job? this will make modified_timestamp < last_run_timestamp
-    # and as a result the job will never update
-    # solution: make the update operation on jobs table async and it should only execute once that particular job is not running irrespective of when the 
-    # update request is submitted.
-    df_update_recs = df_temp[(df_temp['_merge'] == 'both') & (df_temp['is_active'] == 'Y') & (df_temp['modified_timestamp'] > df_temp['last_run_timestamp'])]
+    # TODO: edge case: what if someone updates the jobs table during execution of a job? this will make
+    # modified_timestamp < last_run_timestamp and as a result the job will never update
+    # solution: make the update operation on jobs table async and it should only execute once that particular job
+    # is not running irrespective of when the update request is submitted.
+
+    df_update_recs = df_temp[(df_temp['_merge'] == 'both') & (df_temp['is_active'] == 'Y') &
+                             (df_temp['modified_timestamp'] > df_temp['last_run_timestamp'])]
+
     df_delete_recs = df_temp[(df_temp['_merge'] == 'both') & (df_temp['is_active'] != 'Y')]
-    print(df_delete_recs)
+    # print(df_delete_recs)
     # print(df_insert_recs.dtypes)
 
     # delete operation to delete any inactive job
@@ -571,7 +567,6 @@ def sync_jobs(postgres_instance, glue_instance):
             row['max_capacity']
         )
 
-
     # update any existing job whose definition has been changed recently in Postgres db
     for _, row in df_update_recs.iterrows():
         log.info(f"updating job {row['job_name']}...")
@@ -589,7 +584,7 @@ def sync_jobs(postgres_instance, glue_instance):
     
     postgres_instance.update_jobs_table()
 
-    log.info("successfully synchronizd jobs between database and AWS Glue at {}".format(datetime.now()))
+    log.info("successfully synchronized jobs between database and AWS Glue at {}".format(datetime.now()))
 
 
 def main_admin(max_dpu, postgres_instance, glue_instance):
@@ -645,12 +640,13 @@ def main_user(args, postgres_instance, glue_instance):
 
     return
 
+
 def main():
     args = flag_parser()        # setup parser to parse named arguments
     set_logger(args.logLevel)       # set logger for the app
 
     postgres_instance = PostgresDBService()
-    glue_instance =  GlueJobService()
+    glue_instance = GlueJobService()
     
     if args.userType == 'admin':
         main_admin(args.maxDpu, postgres_instance, glue_instance)
@@ -658,7 +654,6 @@ def main():
         main_user(args, postgres_instance, glue_instance)
     else:
         raise ValueError("invalid --userType, type -h for help")
-
 
 
 if __name__ == "__main__":
