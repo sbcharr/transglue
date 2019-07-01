@@ -25,6 +25,7 @@ def main():
 
     # Retrieve SQS messages
     msg = ""
+    i = 0
     while True:
         if msg != "done!":
             try:
@@ -49,7 +50,11 @@ def main():
                 log.error(e)
                 raise
             print("message {} deleted from the queue".format(msg['Body'].strip()))
+            i += 1
         else:
+            if i != int(args.batchSize):
+                log.error("not all {} values were received".format(args.batchSize))
+                raise
             break
 
     log.info("job {} with instance id {} is completed successfully".format(args.jobName, args.jobInstance))

@@ -34,6 +34,7 @@ def flag_parser():
     parser.add_argument("--maxDpu", help="(optional) max dpu that AWS Glue uses, available only with user type 'user'")
     parser.add_argument("--logLevel", help="(optional) log level, values are 'debug', 'info', \
                                            'warning', 'error', 'critical'")
+    parser.add_argument("--batchSize", help="(optional for admin) number of tables to process")
 
     args = parser.parse_args()
 
