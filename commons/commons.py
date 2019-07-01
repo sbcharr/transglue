@@ -15,7 +15,7 @@ os.environ['GLUE_POSTGRES_PASSWORD'] = __config['postgres-db']['GLUE_POSTGRES_PA
 os.environ['AWS_ACCESS_KEY_ID'] = __config['aws-creds']['aws_access_key_id']
 os.environ['AWS_SECRET_ACCESS_KEY'] = __config['aws-creds']['aws_secret_access_key']
 os.environ['REGION_NAME'] = __config['aws-creds']['region_name']
-os.environ['IAM_ROLE_DATA_COPY'] = __config['aws-creds']['iam-role_data_copy']
+os.environ['IAM_ROLE'] = __config['aws-creds']['iam-role']
 
 os.environ['SQS_QUEUE_NAME'] = __config['aws-sqs']['sqs_queue_name']
 

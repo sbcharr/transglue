@@ -1,7 +1,6 @@
 import logging as log
 import time
 import pandas as pd
-from datetime import datetime
 from commons import commons as c
 from aws import database_service as db_service, glue_service, sqs_service
 
@@ -11,6 +10,8 @@ def sync_jobs(job_instance, postgres_instance, glue_instance):
     db and AWS Glue. It receives a postgres instance and a aws instance as its parameters. Sync
     job should be executed by an Admin user.
     '''
+
+    role_arn = c.os.environ['IAM_ROLE']
 
     # Get all relevant aws jobs from Postgres db
     df_jobs_all = postgres_instance.get_glue_jobs_from_db(job_instance)
@@ -51,9 +52,8 @@ def sync_jobs(job_instance, postgres_instance, glue_instance):
         glue_instance.create_glue_job(
             row['job_name'],
             row['job_description'],
-            row['role_arn'],
+            role_arn,
             row['script_location'],
-            row['tags'],
             row['command_name'],
             row['max_concurrent_runs'],
             row['max_retries'],
@@ -67,7 +67,7 @@ def sync_jobs(job_instance, postgres_instance, glue_instance):
         glue_instance.update_glue_job(
             row['job_name'],
             row['job_description'],
-            row['role_arn'],
+            role_arn,
             row['script_location'],
             row['command_name'],
             row['max_concurrent_runs'],

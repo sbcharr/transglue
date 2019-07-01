@@ -38,8 +38,7 @@ class GlueJobService(AwsGlueService):
                         job_name, 
                         description, 
                         role, 
-                        script_loc, 
-                        tags,
+                        script_loc,
                         command_name='glueetl',
                         max_concurrent_runs=3, 
                         max_retries=1, 
@@ -58,10 +57,7 @@ class GlueJobService(AwsGlueService):
                         },
                 MaxRetries=int(max_retries),
                 Timeout=int(timeout),
-                AllocatedCapacity=int(max_capacity),
-                # Tags={
-                #     'key': tags
-                # }
+                AllocatedCapacity=int(max_capacity)
             )
         except Exception as err:
             log.error(err)
@@ -104,7 +100,7 @@ class GlueJobService(AwsGlueService):
         log.info("aws job {} is successfully updated".format(job_name))
 
     def delete_glue_job(self, job_name):
-        print(job_name)
+        # print(job_name)
         try:
             r = self.client.delete_job(
                 JobName=job_name

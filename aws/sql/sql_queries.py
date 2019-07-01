@@ -3,7 +3,6 @@ create_table_jobs = "CREATE TABLE IF NOT EXISTS jobs ( \
     job_name text PRIMARY KEY, \
     job_description text, \
     log_uri text, \
-    role_arn text NOT NULL, \
     max_concurrent_runs int DEFAULT 1, \
     command_name text DEFAULT 'glueetl', \
     script_location text not null, \
@@ -11,7 +10,6 @@ create_table_jobs = "CREATE TABLE IF NOT EXISTS jobs ( \
     timeout_minutes int DEFAULT 240, \
     max_capacity numeric(3,1), \
     notify_delay_after int, \
-    tags text NOT NULL, \
     created_timestamp timestamp DEFAULT now() NOT NULL, \
     modified_timestamp timestamp DEFAULT now() NOT NULL, \
     last_sync_timestamp timestamp DEFAULT '1970-01-01 00:00:00' NOT NULL, \
