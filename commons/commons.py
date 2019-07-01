@@ -7,10 +7,10 @@ import os
 __config = configparser.ConfigParser()
 __config.read(os.path.join(os.getcwd(), 'dl.cfg'))
 
-os.environ['GLUE_DB_HOST'] = __config['postgres-db']['GLUE_DB_HOST']
-os.environ['GLUE_JOBS_DB'] = __config['postgres-db']['GLUE_JOBS_DB']
-os.environ['GLUE_POSTGRES_USER'] = __config['postgres-db']['GLUE_POSTGRES_USER']
-os.environ['GLUE_POSTGRES_PASSWORD'] = __config['postgres-db']['GLUE_POSTGRES_PASSWORD']
+os.environ['GLUE_DB_HOST'] = __config['control-db']['GLUE_DB_HOST']
+os.environ['GLUE_JOBS_DB'] = __config['control-db']['GLUE_JOBS_DB']
+os.environ['GLUE_DB_USER'] = __config['control-db']['GLUE_DB_USER']
+os.environ['GLUE_DB_PASSWORD'] = __config['control-db']['GLUE_DB_PASSWORD']
 
 os.environ['AWS_ACCESS_KEY_ID'] = __config['aws-creds']['aws_access_key_id']
 os.environ['AWS_SECRET_ACCESS_KEY'] = __config['aws-creds']['aws_secret_access_key']

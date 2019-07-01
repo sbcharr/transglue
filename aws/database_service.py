@@ -22,7 +22,7 @@ class MetadataDBService:
         pass
 
     @abc.abstractmethod
-    def get_glue_jobs_from_db(self, job_instance):
+    def get_glue_jobs_from_db(self):
         """
         this is responsible to get all related glue jobs from AWS Glue service.
         """
@@ -81,8 +81,8 @@ class PostgresDBService(MetadataDBService):
     def __init__(self):
         self.__host = c.os.environ['GLUE_DB_HOST']
         self.__dbname = c.os.environ['GLUE_JOBS_DB']
-        self.__user = c.os.environ['GLUE_POSTGRES_USER']
-        self.__password = c.os.environ['GLUE_POSTGRES_PASSWORD']
+        self.__user = c.os.environ['GLUE_DB_USER']
+        self.__password = c.os.environ['GLUE_DB_PASSWORD']
 
     def create_db_conn(self, host, dbname, user, password):
         try:
@@ -117,16 +117,16 @@ class PostgresDBService(MetadataDBService):
 
         log.info("successfully created all necessary control schema objects")
 
-    def get_glue_jobs_from_db(self, job_instance):
+    def get_glue_jobs_from_db(self):
         """
         get all glue jobs from the 'jobs' table. This function returns a pandas sql data frame
         """
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
-        sql_stmt = sq.select_from_jobs.format(int(job_instance))
+        sql_stmt = sq.select_from_jobs
 
         try:
             cur.execute(sq.use_schema)
-            df = sqlio.read_sql_query(sql_stmt.format(job_instance), conn)
+            df = sqlio.read_sql_query(sql_stmt, conn)
         except Exception as e:
             log.info("Error: select *")
             log.error(e)
@@ -160,13 +160,13 @@ class PostgresDBService(MetadataDBService):
             conn.close()
             log.info("successfully closed the db connection")
 
-        log.info("column 'last_run_timestamp' in 'jobs' table is successfully updated")
+        log.info("column 'last_sync_timestamp' in 'jobs' table is successfully updated")
 
-    def update_job_instance(self, job_name, job_instance, job_run_id, job_status_ctx=1):
-        if job_status_ctx == 0:
-            status = "completed"
-        else:
-            status = "in-progress"
+    def update_job_instance(self, job_name, job_instance, job_run_id, status):
+        # if job_status_ctx == 0:
+        #     status = "completed"
+        # else:
+        #     status = "in-progress"
 
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
         sql_stmt = sq.update_table_job_instances.format(job_run_id, status, job_name, job_instance)

@@ -37,18 +37,17 @@ create_table_job_details = "CREATE TABLE IF NOT EXISTS job_details ( \
 
 use_schema = "SET search_path TO job_control_admin;"
 
-select_from_jobs = "select jobs.* from jobs join job_instances j on jobs.job_name = j.job_name" \
-                   " where j.job_instance = '{}';"
+select_from_jobs = "select * from jobs;"
 select_from_job_instances = "select job_run_id, status from job_instances where job_name = '{}' \
                             and job_instance = '{}';"
-select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = '{}'"
+select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = {};"
 
-update_table_jobs = "update jobs set last_sync_timestamp = '{}' where is_active = 'Y'"
+update_table_jobs = "update jobs set last_sync_timestamp = '{}';"
 
 update_table_job_instances = "update job_instances set job_run_id = '{}', status = '{}' where job_name = '{}' \
-                            and job_instance = '{}"
+                            and job_instance = {};"
 update_table_job_details = "update job_details set last_run_timestamp = '{}' where job_name = '{}' \
-                            and job_instance = '{}' and table_name = '{}'"
+                            and job_instance = {} and table_name = '{}';"
 
 load_data_to_table = "copy {} from '{}' iam_role '{}' format as parquet;"
 
