@@ -81,12 +81,13 @@ class PostgresDBService(MetadataDBService):
     def __init__(self):
         self.__host = c.os.environ['GLUE_DB_HOST']
         self.__dbname = c.os.environ['GLUE_JOBS_DB']
+        self.__port = c.os.environ['GLUE_DB_PORT']
         self.__user = c.os.environ['GLUE_DB_USER']
         self.__password = c.os.environ['GLUE_DB_PASSWORD']
 
     def create_db_conn(self, host, dbname, user, password):
         try:
-            conn = psycopg2.connect("host={} dbname={} user={} password={}".format(host, dbname, user, password))
+            conn = psycopg2.connect("dbname={} host={} port={} user={} password={}".format(self.__dbname, self.__host, self.__port, self.__user, self.__password))
         except psycopg2.Error as e:
             log.info("Error: Could not make connection to the Postgres database")
             log.error(e)
@@ -94,7 +95,7 @@ class PostgresDBService(MetadataDBService):
         cur = conn.cursor()
 
         conn.set_session(autocommit=True)
-        log.info("successfully created connection to Postgresql, autocommit is on")
+        log.info("successfully created connection to the database, autocommit is on")
 
         return conn, cur
 
@@ -140,7 +141,22 @@ class PostgresDBService(MetadataDBService):
 
         return df
 
-    # TODO: create a separate variadic function encapsulating db operating to avoid repetitiveness
+    def is_active_job(self, job_name, job_instance):
+        conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+        sql_stmt = sq.select_is_active_job.format(job_name, job_instance)
+
+        try:
+            cur.execute(sq.use_schema)
+            df = sqlio.read_sql_query(sql_stmt, conn)
+        except Exception as e:
+            log.error(e)
+            raise
+        finally:
+            cur.close()
+            conn.close()
+            log.info("successfully closed the db connection")
+
+        return df
 
     def update_jobs_table(self):
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
@@ -183,7 +199,7 @@ class PostgresDBService(MetadataDBService):
             conn.close()
             log.info("successfully closed the db connection")
 
-        log.info("column '{}' in '{}' table is successfully updated".format(job_run_id, job_instance))
+        log.info("job_instances table is successfully updated")
 
     def update_job_details(self, job_name, job_instance, table):
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
@@ -213,7 +229,7 @@ class PostgresDBService(MetadataDBService):
         try:
             cur.execute(sq.use_schema)
             cur.execute(sql_stmt)
-            row = cur.fetchall()
+            row = cur.fetchone()
         except Exception as e:
             log.info("select job_instances ...")
             log.error(e)
@@ -248,6 +264,23 @@ class PostgresDBService(MetadataDBService):
 
         return tables
 
+    def truncate_stage_table(self, target_table):
+        conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
+        sql_stmt = sq.truncate_table_stg.format(target_table)
+
+        try:
+            cur.execute(sql_stmt)
+        except Exception as e:
+            log.info("truncate stage table {}...".format(target_table))
+            log.error(e)
+            raise
+        finally:
+            cur.close()
+            conn.close()
+            log.info("successfully closed the db connection")
+
+        log.info("successfully truncated the stage table {}".format(target_table))
+
     def copy_to_database(self, target_table, temp_s3_bucket, iam_role):
         conn, cur = self.create_db_conn(self.__host, self.__dbname, self.__user, self.__password)
         s3_path = "s3://{}/data/{}/parquet/".format(temp_s3_bucket, target_table)
@@ -262,3 +295,4 @@ class PostgresDBService(MetadataDBService):
             cur.close()
             conn.close()
             log.info("successfully closed the db connection")
+

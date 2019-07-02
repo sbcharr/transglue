@@ -9,6 +9,7 @@ __config.read(os.path.join(os.getcwd(), 'dl.cfg'))
 
 os.environ['GLUE_DB_HOST'] = __config['control-db']['GLUE_DB_HOST']
 os.environ['GLUE_JOBS_DB'] = __config['control-db']['GLUE_JOBS_DB']
+os.environ['GLUE_DB_PORT'] = __config['control-db']['GLUE_DB_PORT']
 os.environ['GLUE_DB_USER'] = __config['control-db']['GLUE_DB_USER']
 os.environ['GLUE_DB_PASSWORD'] = __config['control-db']['GLUE_DB_PASSWORD']
 
@@ -60,4 +61,8 @@ def setup():
     set_logger()
 
     return args
+
+
+def validate_input():
+    pass
 

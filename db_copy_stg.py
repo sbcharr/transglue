@@ -1,26 +1,28 @@
 from botocore.exceptions import ClientError
 import logging as log
 import time
-import base64
 from commons import commons as c
 from aws import sqs_service, database_service
 
 
 def main():
-    temp_s3_bucket = c.os.environ['TEMP_S3_BUCKET']
-    iam_role = c.os.environ['IAM_ROLE_DATA_COPY']
-
     args = c.setup()
+
+    job_name = args.jobName
+    job_instance = args.jobInstance
+    batch_size = args.batchSize
+    temp_s3_bucket = c.os.environ['TEMP_S3_BUCKET']
+    iam_role = c.os.environ['IAM_ROLE']
+
     postgres_instance = database_service.PostgresDBService()
     sqs_instance = sqs_service.AwsSqsService()
 
-    encoded_queue_name = base64.b64encode(args.jobName + "#" + args.jobInstance) + ".fifo"
+    queue_name = job_name + "_" + job_instance + ".fifo"
 
     queue_url = sqs_instance.sqs_client.get_queue_url(
-        QueueName=encoded_queue_name,
+        QueueName=queue_name,
     )
 
-    # Assign this value before running the program
     sqs_queue_url = queue_url['QueueUrl']
 
     # Retrieve SQS messages
@@ -35,13 +37,20 @@ def main():
                 time.sleep(15)
                 continue
 
+            table = msg['Body'].strip()
+            job_name = args.jobName
+            job_instance = args.jobInstance
+
+            log.info("truncating table {}".format(table))
+            postgres_instance.truncate_stage_table(table)
+
             log.info("loading data into table {}...".format(msg['Body'].strip()))
-            postgres_instance.copy_to_database(msg.strip(), temp_s3_bucket, iam_role)
+            postgres_instance.copy_to_database(table, temp_s3_bucket, iam_role)
 
             log.info("successfully loaded data into table {}".format(msg['Body'].strip()))
-            postgres_instance.update_job_details(args.jobName, args.jobInstance, msg.strip())
+            postgres_instance.update_job_details(job_name, job_instance, table)
 
-            log.info("updated table name {} in job_details".format(msg['Body'].strip()))
+            log.info("updated table name {} in job_details".format(table))
 
             msg_receipt_handle = msg['ReceiptHandle']
             try:
@@ -49,15 +58,15 @@ def main():
             except ClientError as e:
                 log.error(e)
                 raise
-            print("message {} deleted from the queue".format(msg['Body'].strip()))
+            print("message {} deleted from the queue".format(table))
             i += 1
         else:
-            if i != int(args.batchSize):
-                log.error("not all {} values were received".format(args.batchSize))
+            if i != int(batch_size):
+                log.error("not all {} messages were received".format(batch_size))
                 raise
             break
 
-    log.info("job {} with instance id {} is completed successfully".format(args.jobName, args.jobInstance))
+    log.info("job {} with instance id {} is completed successfully".format(job_name, job_instance))
 
 
 if __name__ == "__main__":
