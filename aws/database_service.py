@@ -2,75 +2,78 @@ from datetime import datetime
 import logging as log
 import psycopg2
 import pandas.io.sql as sqlio
-import abc
+from abc import ABCMeta, abstractmethod
 from aws.sql import sql_queries as sq
 from commons import commons as c
+
+
+"""Base class for DB service."""
 
 
 class MetadataDBService:
     """
     MetadataDBService is an abstract class which defines the various signatures for classes
-    which implements these function.
+    which implement these functions.
     """
-    __metaclass__ = abc.ABCMeta
+    __metaclass__ = ABCMeta
 
-    @abc.abstractmethod
+    @abstractmethod
     def create_db_conn(self, host, dbname, user, password):
         """
-        creates a database objects to the underlying db
+        creates a database object to the underlying db
         """
-        pass
+        raise NotImplementedError()
 
-    @abc.abstractmethod
+    @abstractmethod
     def get_glue_jobs_from_db(self):
         """
         this is responsible to get all related glue jobs from AWS Glue service.
         """
-        pass
+        raise NotImplementedError()
 
-    @abc.abstractmethod
+    @abstractmethod
     def get_job_status(self, job_name, job_instance):
         """
         this function retrieves job status from metadata db.
         """
-        pass
+        raise NotImplementedError()
 
-    @abc.abstractmethod
+    @abstractmethod
     def get_job_details(self, job_name, job_instance):
         """
         this function retrieves job details from metadata db.
         """
-        pass
+        raise NotImplementedError()
 
-    @abc.abstractmethod
+    @abstractmethod
     def update_jobs_table(self):
         """
         this function updates the control table called 'jobs' in metadata db.
         """
-        pass
+        raise NotImplementedError()
 
-    @abc.abstractmethod
+    @abstractmethod
     def update_job_instance(self, job_name, job_instance, job_run_id, job_status_ctx):
         """
         this function updates the control table called 'jobs_instances' in metadata db.
         """
-        pass
+        raise NotImplementedError()
 
-    @abc.abstractmethod
+    @abstractmethod
     def copy_to_database(self, target_table, temp_s3_bucket, iam_role):
         """
 
         :return:
         """
-        pass
+        raise NotImplementedError()
 
-    @abc.abstractmethod
+    @abstractmethod
     def update_job_details(self, job_name, job_instance, table):
         """
 
         :return:
         """
-        pass
+        raise NotImplementedError()
 
 
 class PostgresDBService(MetadataDBService):
