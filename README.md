@@ -1,5 +1,5 @@
-# Transflow
-AWS supports **Glue** as a service which provides users to execute **Spark** jobs on a serverless platform. Transflow is a framework which makes it easy and seamless to run AWS Glue scripts without worrying about the execution part. There are multiple cases when it's preferred to use some other scheduling service than Glue because of obvious reasons. **Transflow** defines the flow of data and requires minimal setup to do its job. 
+# TransGlue
+AWS supports **Glue** as a service which provides users to execute **Spark** jobs on a serverless platform. Transflow is a framework which makes it easy and seamless to run AWS Glue scripts without worrying about the execution part. There are multiple cases when it's preferred to use some other scheduling service than Glue because of obvious reasons. **TransGlue** defines the flow of data and requires minimal setup to do its job. 
 
 # Architecture
 
