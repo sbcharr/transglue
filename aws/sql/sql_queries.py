@@ -1,6 +1,7 @@
 create_control_schema = "CREATE SCHEMA IF NOT EXISTS job_control_admin;"
+
 create_table_jobs = "CREATE TABLE IF NOT EXISTS jobs ( \
-    job_name varchar(50) not null, \
+    job_name varchar(50) PRIMARY KEY, \
     job_description varchar(100), \
     log_uri varchar(100), \
     max_concurrent_runs integer not null DEFAULT 1, \
@@ -13,21 +14,26 @@ create_table_jobs = "CREATE TABLE IF NOT EXISTS jobs ( \
     created_timestamp timestamp not null DEFAULT sysdate, \
     modified_timestamp timestamp not null DEFAULT sysdate, \
     last_sync_timestamp timestamp not null DEFAULT '1970-01-01 00:00:00', \
-    is_active char(1) DEFAULT 'N' \
-);"
+    is_active char(1) DEFAULT 'N');"
 
 create_table_job_instances = "CREATE TABLE IF NOT EXISTS job_instances ( \
-    job_name varchar(50) not null, \
-    job_instance integer not null, \
+    job_name varchar(50), \
+    job_instance integer, \
     job_run_id varchar, \
-    status varchar(10));"
+    status varchar(10), \
+    PRIMARY KEY(job_name, job_instance), \
+    FOREIGN KEY(job_name) REFERENCES jobs(job_name) );"
 
 create_table_job_details = "CREATE TABLE IF NOT EXISTS job_details ( \
-    job_name varchar(50) not null, \
-    job_instance integer not null, \
-    table_name varchar not null, \
+    job_name varchar(50), \
+    job_instance integer, \
+    table_name varchar, \
     created_timestamp timestamp not null DEFAULT sysdate, \
-    last_run_timestamp timestamp not null DEFAULT '1970-01-01 00:00:00');"
+    last_run_timestamp timestamp, \
+    reprocess_timestamp timestamp, \
+    is_active char(1) DEFAULT 'N', \
+    PRIMARY KEY(job_name, job_instance, table_name), \
+    FOREIGN KEY(job_name, job_instance) REFERENCES job_details(job_name, job_instance) );"
 
 use_schema = "SET search_path TO job_control_admin;"
 
@@ -39,7 +45,8 @@ select_is_active_job = "select 1 from jobs where if exists (select a.job_name, b
 
 select_from_job_instances = "select job_run_id, status from job_instances where job_name = '{}' \
                             and job_instance = '{}';"
-select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = {};"
+select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = {} \
+                          and is_active = 'Y';"
 
 update_table_jobs = "update jobs set last_sync_timestamp = '{}';"
 

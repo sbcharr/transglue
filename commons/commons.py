@@ -7,14 +7,6 @@ import os
 __config = configparser.ConfigParser()
 __config.read(os.path.join(os.getcwd(), 'dl.cfg'))
 
-os.environ['GLUE_DB_HOST'] = __config['control-db']['GLUE_DB_HOST']
-os.environ['GLUE_JOBS_DB'] = __config['control-db']['GLUE_JOBS_DB']
-os.environ['GLUE_DB_PORT'] = __config['control-db']['GLUE_DB_PORT']
-os.environ['GLUE_DB_USER'] = __config['control-db']['GLUE_DB_USER']
-os.environ['GLUE_DB_PASSWORD'] = __config['control-db']['GLUE_DB_PASSWORD']
-
-os.environ['AWS_ACCESS_KEY_ID'] = __config['aws-creds']['aws_access_key_id']
-os.environ['AWS_SECRET_ACCESS_KEY'] = __config['aws-creds']['aws_secret_access_key']
 os.environ['REGION_NAME'] = __config['aws-creds']['region_name']
 os.environ['IAM_ROLE'] = __config['aws-creds']['iam-role']
 
@@ -35,7 +27,9 @@ def flag_parser():
     parser.add_argument("--maxDpu", help="(optional) max dpu that AWS Glue uses, available only with user type 'user'")
     parser.add_argument("--logLevel", help="(optional) log level, values are 'debug', 'info', \
                                            'warning', 'error', 'critical'")
-    parser.add_argument("--batchSize", help="(optional for admin) number of tables to process")
+    parser.add_argument("--from_date", help="from data date to be passed to the Glue script")
+    parser.add_argument("--to_date", help="to date to be passed to the Glue script")
+    # parser.add_argument("--batchSize", help="(optional for admin) number of tables to process") # used for db copy
 
     args = parser.parse_args()
 
