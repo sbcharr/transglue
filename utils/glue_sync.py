@@ -1,12 +1,14 @@
-import logging as log
 import pandas as pd
-from commons import commons as c
+from commons import commons
 from service import database_service as db_service, glue_service
 
 """
     This script is to be scheduled as a separate job, e.g. every 4 hours. When it runs, it updates the status of
     jobs available in db with that of AWS Glue. Make sure to pass --userType as 'admin', else it will thrown an error
 """
+
+CONFIG = commons.get_config()
+log = commons.get_logger(CONFIG['logLevel'], CONFIG['logFile'])
 
 
 def sync_jobs(postgres_instance, glue_instance):
@@ -15,7 +17,7 @@ def sync_jobs(postgres_instance, glue_instance):
     job should be executed by an Admin user.
     """
 
-    role_arn = c.os.environ['IAM_ROLE']
+    role_arn = commons.os.environ['IAM_ROLE']
 
     # Get all relevant aws jobs from Postgres db
     df_job = postgres_instance.get_glue_jobs_from_db()
@@ -83,22 +85,16 @@ def sync_jobs(postgres_instance, glue_instance):
     log.info("successfully synchronized job between metadata and AWS Glue")
 
 
-def main():
-    args = c.setup()
-
-    postgres_instance = db_service.PostgresService()
-    glue_instance = glue_service.GlueJobService()
-
-    if args.userType != 'admin':
-        log.error("only valid option is admin; invalid --userType, type -h for help")
-        raise
-
-    # creates necessary db objects to control various Glue jobs
-    postgres_instance.create_postgres_db_objects()
-
-    # syncs jobs between control tables and aws glue
-    sync_jobs(postgres_instance, glue_instance)
-
-
-if __name__ == "__main__":
-    main()
+# def main():
+#     postgres_instance = db_service.PostgresService()
+#     glue_instance = glue_service.GlueJobService()
+#
+#     # creates necessary db objects to control various Glue jobs
+#     postgres_instance.create_postgres_db_objects()
+#
+#     # syncs jobs between control tables and aws glue
+#     sync_jobs(postgres_instance, glue_instance)
+#
+#
+# if __name__ == "__main__":
+#     main()

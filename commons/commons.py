@@ -81,22 +81,5 @@ def get_logger(log_level, log_file=None):
 
     return logger
 
-# def set_logger(filename, log_level=log.INFO):
-#     """
-#     Main logger set for the program. Default log level is set to INFO.
-#     """
-#
-#
-#     log.basicConfig(filename=filename, filemode='a+', format=log_format, level=log_level_switcher.get(log_level, log.INFO))
 
-
-# def setup(filename, log_level="info"):
-#     # args = flag_parser()
-#     set_logger(filename, log_level)
-#
-#     # return args
-#
-#
-# def validate_input():
-#     pass
 

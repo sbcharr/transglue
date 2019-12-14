@@ -1,5 +1,4 @@
 from datetime import datetime
-# import logging as log
 from commons import commons
 import psycopg2
 import pandas.io.sql as sqlio

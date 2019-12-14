@@ -4,6 +4,7 @@ create_table_jobs = "CREATE TABLE IF NOT EXISTS jobs ( \
     job_name varchar(50) PRIMARY KEY, \
     job_description varchar(100), \
     log_uri varchar(100), \
+    glue_version varchar(5) not null, \
     max_concurrent_runs integer not null DEFAULT 1, \
     command_name varchar(10) not null DEFAULT 'glueetl', \
     script_location varchar(200) not null, \

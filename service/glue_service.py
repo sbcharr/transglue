@@ -6,6 +6,8 @@ from commons import commons
 CONFIG = commons.get_config()
 log = commons.get_logger(CONFIG['logLevel'], CONFIG['logFile'])
 
+# All functionality is based on AWS Glue boto3 API version 1.10.38
+
 
 class AwsGlueService:
     def __init__(self, region_name, aws_access_key_id=None, aws_secret_access_key=None):
@@ -23,11 +25,11 @@ class GlueJobService(AwsGlueService):
         jobs = []
         try:
             while is_run == 0:
-                r = self.client.get_jobs(NextToken=next_token, MaxResults=100)
-                for job in r['Jobs']:
+                response = self.client.get_jobs(NextToken=next_token, MaxResults=1000,)
+                for job in response['Jobs']:
                     jobs.append(job['Name'])
-                if 'NextToken' in r:
-                    next_token = r['NextToken']
+                if 'NextToken' in response:
+                    next_token = response['NextToken']
                 else:
                     is_run = 1
         except ClientError as e:
@@ -41,13 +43,15 @@ class GlueJobService(AwsGlueService):
                         description, 
                         role, 
                         script_loc,
+                        glue_version,
+                        max_capacity,
                         command_name='glueetl',
-                        max_concurrent_runs=3, 
+                        python_version='3',
+                        max_concurrent_runs=10,
                         max_retries=1, 
-                        timeout=180, 
-                        max_capacity=2.0):
+                        timeout=180):
         try:
-            _ = self.client.create_job(
+            response = self.client.create_job(
                 Name=job_name,
                 Description=description,
                 Role=role,
@@ -55,83 +59,87 @@ class GlueJobService(AwsGlueService):
                     'MaxConcurrentRuns': int(max_concurrent_runs),
                 },
                 Command={'Name': command_name,
-                         'ScriptLocation': script_loc
+                         'ScriptLocation': script_loc,
+                         'PythonVersion': python_version,
                         },
                 MaxRetries=int(max_retries),
                 Timeout=int(timeout),
-                AllocatedCapacity=int(max_capacity)
+                MaxCapacity=float(max_capacity),
+                GlueVersion=glue_version,
             )
-        except Exception as err:
-            log.error(err)
+        except ClientError as e:
+            log.error(e)
             raise
 
-        log.info("aws job {} is successfully created".format(job_name))
+        log.info("aws job {} is successfully created".format(response['JobName']))
 
     def update_glue_job(self,     
                         job_name,
                         description, 
                         role, 
-                        script_loc, 
+                        script_loc,
+                        log_uri,
+                        max_capacity,
                         command_name='glueetl', 
                         max_concurrent_runs=3, 
                         max_retries=1, 
-                        timeout=180, 
-                        max_capacity=2.0):
+                        timeout=180):
         try:
-            _ = self.client.update_job(
+            response = self.client.update_job(
                 JobName=job_name,
                 JobUpdate={
                     'Description': description,
+                    'LogUri': log_uri,
                     'Role': role,
                     'ExecutionProperty': {
-                        'MaxConcurrentRuns': int(max_concurrent_runs)
+                        'MaxConcurrentRuns': int(max_concurrent_runs),
                     },
                     'Command': {
                         'Name': command_name,
-                        'ScriptLocation': script_loc
+                        'ScriptLocation': script_loc,
                     },
                     'MaxRetries': int(max_retries),
                     'Timeout': int(timeout),
-                    'AllocatedCapacity': int(max_capacity)
+                    'MaxCapacity': float(max_capacity),
                 }
             )
         except ClientError as e:
             log.error(e)
             raise
 
-        log.info("aws job {} is successfully updated".format(job_name))
+        log.info("aws job {} is successfully updated".format(response['JobName']))
 
     def delete_glue_job(self, job_name):
         # print(job_name)
         try:
-            r = self.client.delete_job(
-                JobName=job_name
+            response = self.client.delete_job(
+                JobName=job_name,
             )
         except ClientError as e:
             log.error(e)
             raise
 
-        print(r['JobName'])
+        # print(response['JobName'])
 
-        log.info("aws job {} is successfully deleted".format(job_name))
+        log.info("successfully deleted the aws job {}".format(response['JobName']))
 
     def start_glue_job(self, job_name, job_instance, tables, max_dpu=None):
         if max_dpu is not None:
             try:
-                r = self.client.start_job_run(
+                response = self.client.start_job_run(
                     JobName=job_name,
                     Arguments={
                         '--job-instance': job_instance,
                         '--tables': tables
                     },
-                    MaxCapacity=max_dpu
+                    MaxCapacity=float(max_dpu)
                 )
             except ClientError as e:
                 log.error(e)
                 raise
         else:
             try:
-                r = self.client.start_job_run(
+                response = self.client.start_job_run(
                     JobName=job_name,
                     Arguments={
                         '--job-instance': job_instance,
@@ -142,20 +150,21 @@ class GlueJobService(AwsGlueService):
                 log.error(e)
                 raise
 
-        log.info("aws job {} is successfully started with job id {}".format(job_name, r['JobRunId']))
+        log.info("aws job {} is successfully started with job id {}".format(job_name, response['JobRunId']))
 
-        return r['JobRunId']
+        return response['JobRunId']
 
     def get_glue_job_status(self, job_name, job_run_id):
         try:
-            r = self.client.get_job_run(JobName=job_name, RunId=job_run_id, PredecessorsIncluded=False)
+            response = self.client.get_job_run(JobName=job_name, RunId=job_run_id, PredecessorsIncluded=False,)
         except ClientError as e:
-            log.error("job {} with job run id {} is failed with error {}".format(job_name,
-                                                                                 job_run_id,
-                                                                                 e.response['Error']['Message']))
+            log.error(e)
             raise
+        if 'ErrorMessage' in response['JobRun'].keys():
+            log.info("job {} with job run id {} is failed with error {}".format(job_name, job_run_id,
+                                                                                response['JobRun']['ErrorMessage']))
 
-        return r['JobRun']['JobRunState']
+        return response['JobRun']['JobRunState']
 
 
 # class GlueCrawlerService(AwsGlueService):
