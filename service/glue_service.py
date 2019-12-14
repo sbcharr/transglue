@@ -1,14 +1,16 @@
 import boto3
 from botocore.exceptions import ClientError
-import logging as log
-from commons import commons as c
+# import logging as log
+from commons import commons
+
+CONFIG = commons.get_config()
+log = commons.get_logger(CONFIG['logLevel'], CONFIG['logFile'])
 
 
 class AwsGlueService:
-    def __init__(self):
-        self.client = boto3.client('glue', region_name=c.os.environ['REGION_NAME'],
-                                   aws_access_key_id=c.os.environ['AWS_ACCESS_KEY_ID'],
-                                   aws_secret_access_key=c.os.environ['AWS_SECRET_ACCESS_KEY'])
+    def __init__(self, region_name, aws_access_key_id=None, aws_secret_access_key=None):
+        self.client = boto3.client('glue', region_name=region_name, aws_access_key_id=aws_access_key_id,
+                                   aws_secret_access_key=aws_secret_access_key)
 
 
 class GlueJobService(AwsGlueService):

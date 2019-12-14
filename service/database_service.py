@@ -1,9 +1,13 @@
 from datetime import datetime
-import logging as log
+# import logging as log
+from commons import commons
 import psycopg2
 import pandas.io.sql as sqlio
 from sql import sql_queries as sq
 from metadata.base_metadata_db import MetadataService
+
+CONFIG = commons.get_config()
+log = commons.get_logger(CONFIG['logLevel'], CONFIG['logFile'])
 
 
 class PostgresService(MetadataService):
@@ -29,11 +33,12 @@ class PostgresService(MetadataService):
 
         return conn, cur
 
-    def create_postgres_db_objects(self, execute=False):
+    def create_postgres_db_objects(self):
         """
         function to create the control table related db objects
         """
-        if execute:
+        execute = CONFIG['createMetaLayer']
+        if execute == 'True':
             conn, cur = self.create_db_conn()
             try:
                 for sql_stmt in sq.create_sql_stmts:
@@ -49,7 +54,7 @@ class PostgresService(MetadataService):
 
             log.info("successfully created all necessary control schema objects - if not exists")
         else:
-            log.info("skipping the step 'create db objects' as the value of the param execute is '{}'".format(execute))
+            log.info("skipping the step 'create db objects' as the value of the param execute={}".format(execute))
 
     def get_glue_jobs_from_db(self):
         """
