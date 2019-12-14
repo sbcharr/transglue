@@ -2,7 +2,7 @@ from botocore.exceptions import ClientError
 import logging as log
 import time
 from commons import commons as c
-from aws import sqs_service, database_service
+from service import sqs_service, database_service
 
 
 def main():
@@ -14,7 +14,7 @@ def main():
     temp_s3_bucket = c.os.environ['TEMP_S3_BUCKET']
     iam_role = c.os.environ['IAM_ROLE']
 
-    postgres_instance = database_service.PostgresDBService()
+    postgres_instance = database_service.PostgresService()
     sqs_instance = sqs_service.AwsSqsService()
 
     queue_name = job_name + "_" + job_instance + ".fifo"

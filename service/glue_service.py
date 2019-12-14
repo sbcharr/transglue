@@ -230,7 +230,7 @@ class GlueJobService(AwsGlueService):
 #             )
 #         except ClientError as e:
 #             if e.response['Error']['Code'] == "AlreadyExistsException":
-#                 log.info(f"database {name} already exists in catalog {catalog_id}")
+#                 log.info(f"metadata {name} already exists in catalog {catalog_id}")
 #         except ClientError as e:
 #             log.error(f"error: {e.response['Error']['Message']}")
 #             raise

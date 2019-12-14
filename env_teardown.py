@@ -1,6 +1,6 @@
 import logging as log
 from commons import commons as c
-from aws import sqs_service
+from service import sqs_service
 
 
 def create_sqs_queue(job_name, job_instance, sqs_instance):

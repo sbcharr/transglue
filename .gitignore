@@ -2,3 +2,5 @@
 __pycache__
 dl.cfg
 *.pyc
+*.log
+example_glue_sync_jobs.py

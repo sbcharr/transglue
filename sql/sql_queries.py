@@ -11,8 +11,8 @@ create_table_jobs = "CREATE TABLE IF NOT EXISTS jobs ( \
     timeout_minutes integer not null DEFAULT 240, \
     max_capacity decimal not null, \
     notify_delay_after integer, \
-    created_timestamp timestamp not null DEFAULT sysdate, \
-    modified_timestamp timestamp not null DEFAULT sysdate, \
+    created_timestamp timestamp not null DEFAULT CURRENT_TIMESTAMP, \
+    modified_timestamp timestamp not null DEFAULT CURRENT_TIMESTAMP, \
     last_sync_timestamp timestamp not null DEFAULT '1970-01-01 00:00:00', \
     is_active char(1) DEFAULT 'N');"
 
@@ -28,12 +28,12 @@ create_table_job_details = "CREATE TABLE IF NOT EXISTS job_details ( \
     job_name varchar(50), \
     job_instance integer, \
     table_name varchar, \
-    created_timestamp timestamp not null DEFAULT sysdate, \
+    created_timestamp timestamp not null DEFAULT CURRENT_TIMESTAMP, \
     last_run_timestamp timestamp, \
     reprocess_timestamp timestamp, \
     is_active char(1) DEFAULT 'N', \
     PRIMARY KEY(job_name, job_instance, table_name), \
-    FOREIGN KEY(job_name, job_instance) REFERENCES job_details(job_name, job_instance) );"
+    FOREIGN KEY(job_name, job_instance) REFERENCES job_instances(job_name, job_instance) );"
 
 use_schema = "SET search_path TO job_control_admin;"
 

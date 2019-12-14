@@ -1,7 +1,7 @@
 import logging as log
 import time
 from commons import commons as c
-from aws import database_service as db_service, glue_service
+from service import database_service as db_service, glue_service
 
 
 def run_glue_job(job_name, job_instance, postgres_instance, glue_instance, max_dpu=None):
@@ -42,7 +42,7 @@ def main():
     job_instance = args.jobInstance
     max_dpu = args.maxDpu
 
-    postgres_instance = db_service.PostgresDBService()
+    postgres_instance = db_service.PostgresService()
     glue_instance = glue_service.GlueJobService()
 
     if args.userType != 'user':

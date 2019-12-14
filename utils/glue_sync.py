@@ -1,7 +1,7 @@
 import logging as log
 import pandas as pd
 from commons import commons as c
-from aws import database_service as db_service, glue_service
+from service import database_service as db_service, glue_service
 
 """
     This script is to be scheduled as a separate job, e.g. every 4 hours. When it runs, it updates the status of
@@ -10,10 +10,10 @@ from aws import database_service as db_service, glue_service
 
 
 def sync_jobs(postgres_instance, glue_instance):
-    '''sync_job runs as a separate job on a periodic basic to sync up job info between Postgres
+    """sync_job runs as a separate job on a periodic basic to sync up job info between Postgres
     db and AWS Glue. It receives a postgres instance and a aws instance as its parameters. Sync
     job should be executed by an Admin user.
-    '''
+    """
 
     role_arn = c.os.environ['IAM_ROLE']
 
@@ -80,13 +80,13 @@ def sync_jobs(postgres_instance, glue_instance):
 
     postgres_instance.update_jobs_table()
 
-    log.info("successfully synchronized job between database and AWS Glue")
+    log.info("successfully synchronized job between metadata and AWS Glue")
 
 
 def main():
     args = c.setup()
 
-    postgres_instance = db_service.PostgresDBService()
+    postgres_instance = db_service.PostgresService()
     glue_instance = glue_service.GlueJobService()
 
     if args.userType != 'admin':
