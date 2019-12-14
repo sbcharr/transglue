@@ -70,14 +70,15 @@ def get_logger(log_level, log_file=None):
         'critical': log.CRITICAL
     }
     logger = log.getLogger(__name__)
-    logger.setLevel(log_level_switcher.get(log_level, log.INFO))
+    if not logger.handlers:
+        logger.setLevel(log_level_switcher.get(log_level, log.INFO))
 
-    if log_file is None or log_file == "":
-        logger.addHandler(get_console_handler())
-    else:
-        logger.addHandler(get_file_handler(log_file))
-    # don't propagate to the parent
-    logger.propagate = False
+        if log_file is None or log_file == "":
+            logger.addHandler(get_console_handler())
+        else:
+            logger.addHandler(get_file_handler(log_file))
+        # don't propagate to the parent
+        logger.propagate = False
 
     return logger
 

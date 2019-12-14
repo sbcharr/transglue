@@ -1,5 +1,5 @@
 {
   "logLevel": "info",
   "logFile": "",
-  "createMetaLayer": "False"
+  "createMetaLayer": "True"
 }

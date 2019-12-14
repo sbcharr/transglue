@@ -1,6 +1,4 @@
-.idea
-__pycache__
-dl.cfg
+*.idea
 *.pyc
 *.log*
 example_glue_sync_jobs.py

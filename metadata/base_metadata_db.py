@@ -24,7 +24,7 @@ class MetadataService:
         """
         creates a metadata object to the underlying db
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @abstractmethod
     def get_glue_jobs_from_db(self):

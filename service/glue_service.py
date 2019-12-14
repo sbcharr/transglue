@@ -16,8 +16,8 @@ class AwsGlueService:
 
 
 class GlueJobService(AwsGlueService):
-    def __init__(self):
-        AwsGlueService.__init__(self)
+    def __init__(self, region_name, aws_access_key_id, aws_secret_access_key):
+        super().__init__(region_name, aws_access_key_id, aws_secret_access_key)
     
     def get_glue_jobs(self):
         is_run = 0
@@ -46,7 +46,7 @@ class GlueJobService(AwsGlueService):
                         glue_version,
                         max_capacity,
                         command_name='glueetl',
-                        python_version='3',
+                        python_version="3",
                         max_concurrent_runs=10,
                         max_retries=1, 
                         timeout=180):
@@ -60,8 +60,8 @@ class GlueJobService(AwsGlueService):
                 },
                 Command={'Name': command_name,
                          'ScriptLocation': script_loc,
-                         'PythonVersion': python_version,
-                        },
+                         'PythonVersion': str(python_version),
+                         },
                 MaxRetries=int(max_retries),
                 Timeout=int(timeout),
                 MaxCapacity=float(max_capacity),
@@ -71,7 +71,7 @@ class GlueJobService(AwsGlueService):
             log.error(e)
             raise
 
-        log.info("aws job {} is successfully created".format(response['JobName']))
+        log.info("aws job {} is successfully created".format(response['Name']))
 
     def update_glue_job(self,     
                         job_name,

@@ -3,15 +3,7 @@ create_control_schema = "CREATE SCHEMA IF NOT EXISTS job_control_admin;"
 create_table_jobs = "CREATE TABLE IF NOT EXISTS jobs ( \
     job_name varchar(50) PRIMARY KEY, \
     job_description varchar(100), \
-    log_uri varchar(100), \
-    glue_version varchar(5) not null, \
-    max_concurrent_runs integer not null DEFAULT 1, \
-    command_name varchar(10) not null DEFAULT 'glueetl', \
-    script_location varchar(200) not null, \
-    max_retries integer not null DEFAULT 1, \
-    timeout_minutes integer not null DEFAULT 240, \
-    max_capacity decimal not null, \
-    notify_delay_after integer, \
+    job_param json not null, \
     created_timestamp timestamp not null DEFAULT CURRENT_TIMESTAMP, \
     modified_timestamp timestamp not null DEFAULT CURRENT_TIMESTAMP, \
     last_sync_timestamp timestamp not null DEFAULT '1970-01-01 00:00:00', \
@@ -31,7 +23,6 @@ create_table_job_details = "CREATE TABLE IF NOT EXISTS job_details ( \
     table_name varchar, \
     created_timestamp timestamp not null DEFAULT CURRENT_TIMESTAMP, \
     last_run_timestamp timestamp, \
-    reprocess_timestamp timestamp, \
     is_active char(1) DEFAULT 'N', \
     PRIMARY KEY(job_name, job_instance, table_name), \
     FOREIGN KEY(job_name, job_instance) REFERENCES job_instances(job_name, job_instance) );"

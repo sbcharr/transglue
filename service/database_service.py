@@ -4,6 +4,7 @@ import psycopg2
 import pandas.io.sql as sqlio
 from sql import sql_queries as sq
 from metadata.base_metadata_db import MetadataService
+# import logging as log
 
 CONFIG = commons.get_config()
 log = commons.get_logger(CONFIG['logLevel'], CONFIG['logFile'])

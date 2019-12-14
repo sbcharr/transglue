@@ -1,6 +1,5 @@
 import pandas as pd
 from commons import commons
-from service import database_service as db_service, glue_service
 
 """
     This script is to be scheduled as a separate job, e.g. every 4 hours. When it runs, it updates the status of
@@ -11,13 +10,13 @@ CONFIG = commons.get_config()
 log = commons.get_logger(CONFIG['logLevel'], CONFIG['logFile'])
 
 
-def sync_jobs(postgres_instance, glue_instance):
+def sync_jobs(postgres_instance, glue_instance, role_arn):
     """sync_job runs as a separate job on a periodic basic to sync up job info between Postgres
     db and AWS Glue. It receives a postgres instance and a aws instance as its parameters. Sync
     job should be executed by an Admin user.
     """
 
-    role_arn = commons.os.environ['IAM_ROLE']
+    # role_arn = commons.os.environ['IAM_ROLE']
 
     # Get all relevant aws jobs from Postgres db
     df_job = postgres_instance.get_glue_jobs_from_db()
@@ -34,7 +33,7 @@ def sync_jobs(postgres_instance, glue_instance):
     df_insert_recs = df_temp[(df_temp['_merge'] == 'left_only') & (df_temp['is_active'] == 'Y')]
 
     # TODO: edge case: what if someone updates the jobs table during execution of a job? this will make
-    # modified_timestamp < last_run_timestamp and as a result the job will never update
+    # modified_timestamp < last_sync_timestamp and as a result the job will never update
     # solution: make the update operation on jobs table async and it should only execute once that particular job
     # is not running irrespective of when the update request is submitted.
 
@@ -57,12 +56,13 @@ def sync_jobs(postgres_instance, glue_instance):
             row['job_name'],
             row['job_description'],
             role_arn,
-            row['script_location'],
-            row['command_name'],
-            row['max_concurrent_runs'],
-            row['max_retries'],
-            row['timeout_minutes'],
-            row['max_capacity']
+            row['job_param']['script_location'],
+            row['job_param']['glue_version'],
+            row['job_param']['max_capacity'],
+            row['job_param']['command_name'],
+            row['job_param']['max_concurrent_runs'],
+            row['job_param']['max_retries'],
+            row['job_param']['timeout_minutes']
         )
 
     # update any existing job whose definition has been changed recently in Postgres db
@@ -72,12 +72,13 @@ def sync_jobs(postgres_instance, glue_instance):
             row['job_name'],
             row['job_description'],
             role_arn,
-            row['script_location'],
-            row['command_name'],
-            row['max_concurrent_runs'],
-            row['max_retries'],
-            row['timeout_minutes'],
-            row['max_capacity']
+            row['job_param']['script_location'],
+            row['job_param']['glue_version'],
+            row['job_param']['max_capacity'],
+            row['job_param']['command_name'],
+            row['job_param']['max_concurrent_runs'],
+            row['job_param']['max_retries'],
+            row['job_param']['timeout_minutes']
         )
 
     postgres_instance.update_jobs_table()
