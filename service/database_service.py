@@ -48,9 +48,10 @@ class PostgresService(MetadataService):
                 log.error(e)
                 raise
             finally:
-                cur.close()
-                conn.close()
-                log.info("successfully closed the db connection")
+                if conn:
+                    cur.close()
+                    conn.close()
+                    log.info("successfully closed the db connection")
 
             log.info("successfully created all necessary control schema objects - if not exists")
         else:
@@ -71,9 +72,10 @@ class PostgresService(MetadataService):
             log.error(e)
             raise
         finally:
-            cur.close()
-            conn.close()
-            log.info("successfully closed the db connection")
+            if conn:
+                cur.close()
+                conn.close()
+                log.info("successfully closed the db connection")
 
         log.info("successfully executed function 'get_glue_jobs_from_db'")
 
@@ -90,9 +92,10 @@ class PostgresService(MetadataService):
             log.error(e)
             raise
         finally:
-            cur.close()
-            conn.close()
-            log.info("successfully closed the db connection")
+            if conn:
+                cur.close()
+                conn.close()
+                log.info("successfully closed the db connection")
 
         return df
 
@@ -110,9 +113,10 @@ class PostgresService(MetadataService):
             log.error(e)
             raise
         finally:
-            cur.close()
-            conn.close()
-            log.info("successfully closed the db connection")
+            if conn:
+                cur.close()
+                conn.close()
+                log.info("successfully closed the db connection")
 
         log.info("column 'last_sync_timestamp' in 'jobs' table is successfully updated")
 
@@ -133,9 +137,10 @@ class PostgresService(MetadataService):
             log.error(e)
             raise
         finally:
-            cur.close()
-            conn.close()
-            log.info("successfully closed the db connection")
+            if conn:
+                cur.close()
+                conn.close()
+                log.info("successfully closed the db connection")
 
         log.info("job_instances table is successfully updated")
 
@@ -154,9 +159,10 @@ class PostgresService(MetadataService):
             log.error(e)
             raise
         finally:
-            cur.close()
-            conn.close()
-            log.info("successfully closed the db connection")
+            if conn:
+                cur.close()
+                conn.close()
+                log.info("successfully closed the db connection")
 
         log.info("column 'job_run_id' in 'job_details' table is successfully updated")
 
@@ -173,9 +179,10 @@ class PostgresService(MetadataService):
             log.error(e)
             raise
         finally:
-            cur.close()
-            conn.close()
-            log.info("successfully closed the db connection")
+            if conn:
+                cur.close()
+                conn.close()
+                log.info("successfully closed the db connection")
 
         return row[0], row[1]
 
@@ -192,9 +199,10 @@ class PostgresService(MetadataService):
             log.error(e)
             raise
         finally:
-            cur.close()
-            conn.close()
-            log.info("successfully closed the db connection")
+            if conn:
+                cur.close()
+                conn.close()
+                log.info("successfully closed the db connection")
 
         tables = []
         for row in rows:
@@ -202,22 +210,22 @@ class PostgresService(MetadataService):
 
         return tables
 
-    def truncate_stage_table(self, target_table):
-        conn, cur = self.create_db_conn()
-        sql_stmt = sq.truncate_table_stg.format(target_table)
-
-        try:
-            cur.execute(sql_stmt)
-        except Exception as e:
-            log.info("truncate stage table {}...".format(target_table))
-            log.error(e)
-            raise
-        finally:
-            cur.close()
-            conn.close()
-            log.info("successfully closed the db connection")
-
-        log.info("successfully truncated the stage table {}".format(target_table))
+    # def truncate_stage_table(self, target_table):
+    #     conn, cur = self.create_db_conn()
+    #     sql_stmt = sq.truncate_table_stg.format(target_table)
+    #
+    #     try:
+    #         cur.execute(sql_stmt)
+    #     except Exception as e:
+    #         log.info("truncate stage table {}...".format(target_table))
+    #         log.error(e)
+    #         raise
+    #     finally:
+    #         cur.close()
+    #         conn.close()
+    #         log.info("successfully closed the db connection")
+    #
+    #     log.info("successfully truncated the stage table {}".format(target_table))
 
     # def copy_to_database(self, target_table, temp_s3_bucket, iam_role):
     #     conn, cur = self.create_db_conn()
