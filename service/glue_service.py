@@ -65,7 +65,7 @@ class GlueJobService(AwsGlueService):
                 MaxRetries=int(max_retries),
                 Timeout=int(timeout),
                 MaxCapacity=float(max_capacity),
-                GlueVersion=glue_version,
+                GlueVersion=str(glue_version),
             )
         except ClientError as e:
             log.error(e)
@@ -123,7 +123,7 @@ class GlueJobService(AwsGlueService):
 
         log.info("successfully deleted the aws job {}".format(response['JobName']))
 
-    def start_glue_job(self, job_name, job_instance, tables, max_dpu=None, from_date="", to_date=""):
+    def start_glue_job(self, job_name, job_instance, tables, max_dpu, incr_from, incr_to, context):
         if max_dpu is not None:
             try:
                 response = self.client.start_job_run(
@@ -131,8 +131,9 @@ class GlueJobService(AwsGlueService):
                     Arguments={
                         '--job-instance': job_instance,
                         '--tables': tables,
-                        '--from-date': from_date,
-                        '--to-date': to_date,
+                        '--incr-from': incr_from,
+                        '--incr-to': incr_to,
+                        '--job-context': context,
                     },
                     MaxCapacity=float(max_dpu)
                 )
@@ -145,7 +146,10 @@ class GlueJobService(AwsGlueService):
                     JobName=job_name,
                     Arguments={
                         '--job-instance': job_instance,
-                        '--tables': tables
+                        '--tables': tables,
+                        '--incr-from': incr_from,
+                        '--incr-to': incr_to,
+                        '--job-context': context,
                     }
                 )
             except ClientError as e:

@@ -4,9 +4,9 @@ create_table_jobs = "CREATE TABLE IF NOT EXISTS jobs ( \
     job_name varchar(50) PRIMARY KEY, \
     job_description varchar(100), \
     job_param json not null, \
-    created_timestamp timestamp not null DEFAULT CURRENT_TIMESTAMP, \
-    modified_timestamp timestamp not null DEFAULT CURRENT_TIMESTAMP, \
-    last_sync_timestamp timestamp not null DEFAULT '1970-01-01 00:00:00', \
+    created_timestamp timestamptz not null DEFAULT CURRENT_TIMESTAMP, \
+    modified_timestamp timestamptz not null DEFAULT CURRENT_TIMESTAMP, \
+    last_sync_timestamp timestamptz not null DEFAULT '1970-01-01 00:00:00', \
     is_run_sync char(1) DEFAULT 'N', \
     is_active char(1) DEFAULT 'N');"
 
@@ -22,8 +22,8 @@ create_table_job_details = "CREATE TABLE IF NOT EXISTS job_details ( \
     job_name varchar(50), \
     job_instance integer, \
     table_name varchar, \
-    created_timestamp timestamp not null DEFAULT CURRENT_TIMESTAMP, \
-    last_run_timestamp timestamp, \
+    created_timestamp timestamptz not null DEFAULT CURRENT_TIMESTAMP, \
+    last_run_timestamp timestamptz, \
     is_active char(1) DEFAULT 'N', \
     PRIMARY KEY(job_name, job_instance, table_name), \
     FOREIGN KEY(job_name, job_instance) REFERENCES job_instances(job_name, job_instance) );"

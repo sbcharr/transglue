@@ -161,7 +161,7 @@ class PostgresService(MetadataService):
     def update_jobs_table(self):
         conn, cur = self.create_db_conn()
 
-        current_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
         sql_stmt = sq.update_table_jobs.format(current_timestamp)
 
         try:

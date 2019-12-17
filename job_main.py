@@ -20,8 +20,8 @@ def validate_input_table_with_metadata(postgres_instance, job_name, job_instance
     return True
 
 
-def run_glue_job(job_name, job_instance, postgres_instance, glue_instance, tables=None, max_dpu=None, from_date="",
-                 to_date=""):
+def run_glue_job(job_name, job_instance, postgres_instance, glue_instance, tables=None, max_dpu=None, incr_from="",
+                 incr_to="", context=""):
     # get job run id and status of previous job before running a new instance. This is to ensure
     # that previous job has completed.
     job_run_id, status = postgres_instance.get_job_status(job_name, job_instance)
@@ -44,7 +44,8 @@ def run_glue_job(job_name, job_instance, postgres_instance, glue_instance, table
             log.error("supplied table/tables are not in metadata, please supply correct table names, exiting...")
             return
 
-    job_run_id = glue_instance.start_glue_job(job_name, job_instance, max_dpu, target_tables, from_date, to_date)
+    job_run_id = glue_instance.start_glue_job(job_name, job_instance, max_dpu, target_tables, incr_from, incr_to,
+                                              context)
     # job_run_id = "XYZ123498"
     postgres_instance.update_job_instance(job_name, job_instance, job_run_id, 'UNKNOWN')
 
