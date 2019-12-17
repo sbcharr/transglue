@@ -27,6 +27,21 @@ class MetadataService:
         raise NotImplementedError
 
     @abstractmethod
+    def is_active_job(self, job_name, job_instance):
+
+        raise NotImplementedError
+
+    @abstractmethod
+    def is_run_sync_job(self):
+
+        raise NotImplementedError
+
+    @abstractmethod
+    def check_table_exists(self, tables):
+
+        raise NotImplementedError
+
+    @abstractmethod
     def get_glue_jobs_from_db(self):
         """
         this is responsible to get all related glue jobs from the AWS Glue service.
@@ -46,6 +61,11 @@ class MetadataService:
         this function retrieves job details of active tables from the metadata db.
         """
         raise NotImplementedError()
+
+    @abstractmethod
+    def update_jobs_table_is_run(self):
+
+        raise NotImplementedError
 
     @abstractmethod
     def update_jobs_table(self):

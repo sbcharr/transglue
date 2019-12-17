@@ -7,6 +7,7 @@ create_table_jobs = "CREATE TABLE IF NOT EXISTS jobs ( \
     created_timestamp timestamp not null DEFAULT CURRENT_TIMESTAMP, \
     modified_timestamp timestamp not null DEFAULT CURRENT_TIMESTAMP, \
     last_sync_timestamp timestamp not null DEFAULT '1970-01-01 00:00:00', \
+    is_run_sync char(1) DEFAULT 'N', \
     is_active char(1) DEFAULT 'N');"
 
 create_table_job_instances = "CREATE TABLE IF NOT EXISTS job_instances ( \
@@ -31,6 +32,11 @@ use_schema = "SET search_path TO job_control_admin;"
 
 select_from_jobs = "select * from jobs;"
 
+select_is_run_sync = "select count(*) from jobs where is_run_sync = 'Y';"
+
+select_check_table_exists = "select count(*) from job_details where job_name = '{}' and job_instance = '{}' \
+                                and table_name in ({});"
+
 select_is_active_job = "select 1 from jobs where if exists (select a.job_name, b.job_instance \
                         from jobs a join job_instances b on a.job_name = b.job_name \
                         where a.job_name = '{}' and a.is_active = 'Y';"
@@ -40,7 +46,9 @@ select_from_job_instances = "select job_run_id, status from job_instances where 
 select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = {} \
                           and is_active = 'Y';"
 
-update_table_jobs = "update jobs set last_sync_timestamp = '{}';"
+update_table_jobs_is_run = "update jobs set is_run_sync = 'Y';"
+
+update_table_jobs = "update jobs set last_sync_timestamp = '{}', is_run_sync = 'N';"
 
 update_table_job_instances = "update job_instances set job_run_id = '{}', status = '{}' where job_name = '{}' \
                             and job_instance = {};"

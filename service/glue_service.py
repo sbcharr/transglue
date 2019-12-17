@@ -123,14 +123,16 @@ class GlueJobService(AwsGlueService):
 
         log.info("successfully deleted the aws job {}".format(response['JobName']))
 
-    def start_glue_job(self, job_name, job_instance, tables, max_dpu=None):
+    def start_glue_job(self, job_name, job_instance, tables, max_dpu=None, from_date="", to_date=""):
         if max_dpu is not None:
             try:
                 response = self.client.start_job_run(
                     JobName=job_name,
                     Arguments={
                         '--job-instance': job_instance,
-                        '--tables': tables
+                        '--tables': tables,
+                        '--from-date': from_date,
+                        '--to-date': to_date,
                     },
                     MaxCapacity=float(max_dpu)
                 )

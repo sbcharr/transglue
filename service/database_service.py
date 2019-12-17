@@ -4,7 +4,7 @@ import psycopg2
 import pandas.io.sql as sqlio
 from sql import sql_queries as sq
 from metadata.base_metadata_db import MetadataService
-# import logging as log
+
 
 CONFIG = commons.get_config()
 log = commons.get_logger(CONFIG['logLevel'], CONFIG['logFile'])
@@ -98,6 +98,65 @@ class PostgresService(MetadataService):
                 log.info("successfully closed the db connection")
 
         return df
+
+    def is_run_sync_job(self):
+        conn, cur = self.create_db_conn()
+        sql_stmt = sq.select_is_run_sync
+
+        try:
+            cur.execute(sq.use_schema)
+            cur.execute(sql_stmt)
+            is_run_sync = cur.fetchone()
+        except Exception as e:
+            log.error(e)
+            raise
+        finally:
+            if conn:
+                cur.close()
+                conn.close()
+                log.info("successfully closed the db connection")
+
+        if is_run_sync[0] == 0:
+            return False
+
+        return True
+
+    def check_table_exists(self, tables):
+        conn, cur = self.create_db_conn()
+        sql_stmt = sq.select_check_table_exists.format(tables)
+
+        try:
+            cur.execute(sq.use_schema)
+            cur.execute(sql_stmt)
+            recs_count = cur.fetchone()
+        except Exception as e:
+            log.error(e)
+            raise
+        finally:
+            if conn:
+                cur.close()
+                conn.close()
+                log.info("successfully closed the db connection")
+
+        return recs_count[0]
+
+    def update_jobs_table_is_run(self):
+        conn, cur = self.create_db_conn()
+        sql_stmt = sq.update_table_jobs_is_run
+
+        try:
+            cur.execute(sq.use_schema)
+            cur.execute(sql_stmt)
+        except Exception as e:
+            log.error(e)
+            raise
+        finally:
+            if conn:
+                cur.close()
+                conn.close()
+                log.info("successfully closed the db connection")
+
+        log.info("sync job run info is successfully updated")
 
     def update_jobs_table(self):
         conn, cur = self.create_db_conn()

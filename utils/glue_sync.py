@@ -16,7 +16,12 @@ def sync_jobs(postgres_instance, glue_instance, role_arn):
     job should be executed by an Admin user.
     """
 
-    # role_arn = commons.os.environ['IAM_ROLE']
+    is_run_sync = postgres_instance.is_run_sync_job()
+    if is_run_sync:
+        log.error("already an instance of the glue sync job in progress, exiting...")
+        return
+
+    postgres_instance.update_jobs_table_is_run()
 
     # Get all relevant aws jobs from Postgres db
     df_job = postgres_instance.get_glue_jobs_from_db()
@@ -26,7 +31,7 @@ def sync_jobs(postgres_instance, glue_instance, role_arn):
 
     # get_glue_jobs returns all job names from AWS Glue as a list
     df_glue_jobs = pd.DataFrame(glue_instance.get_glue_jobs(), columns=['job_name'])
-    print(df_glue_jobs)
+    # print(df_glue_jobs)
     # pandas data frame is used to identify jobs that are to be created, updated and deleted in AWS Glue Service
     df_temp = pd.merge(df_job, df_glue_jobs, left_on='job_name', right_on='job_name', how='outer', indicator=True)
 
