@@ -22,7 +22,8 @@ class GlueJobService(AwsGlueService):
     def get_glue_jobs(self):
         is_run = 0
         next_token = ""
-        jobs = []
+        jobs, err = [], None
+
         try:
             while is_run == 0:
                 response = self.client.get_jobs(NextToken=next_token, MaxResults=1000,)
@@ -34,9 +35,10 @@ class GlueJobService(AwsGlueService):
                     is_run = 1
         except ClientError as e:
             log.error(e)
-            raise
+            err = e
+            # raise
        
-        return jobs
+        return jobs, err
 
     def create_glue_job(self, 
                         job_name, 
@@ -48,7 +50,7 @@ class GlueJobService(AwsGlueService):
                         command_name='glueetl',
                         python_version="3",
                         max_concurrent_runs=10,
-                        max_retries=1, 
+                        max_retries=0,
                         timeout=180):
         try:
             response = self.client.create_job(
@@ -69,7 +71,8 @@ class GlueJobService(AwsGlueService):
             )
         except ClientError as e:
             log.error(e)
-            raise
+            return e
+            # raise
 
         log.info("aws job {} is successfully created".format(response['Name']))
 
@@ -105,19 +108,20 @@ class GlueJobService(AwsGlueService):
             )
         except ClientError as e:
             log.error(e)
-            raise
+            return e
+            # raise
 
         log.info("aws job {} is successfully updated".format(response['JobName']))
 
     def delete_glue_job(self, job_name):
-        # print(job_name)
         try:
             response = self.client.delete_job(
                 JobName=job_name,
             )
         except ClientError as e:
             log.error(e)
-            raise
+            return e
+            # raise
 
         # print(response['JobName'])
 
@@ -129,7 +133,7 @@ class GlueJobService(AwsGlueService):
                 response = self.client.start_job_run(
                     JobName=job_name,
                     Arguments={
-                        '--job-instance': job_instance,
+                        '--job-instance': str(job_instance),
                         '--tables': tables,
                         '--incr-from': incr_from,
                         '--incr-to': incr_to,
@@ -145,7 +149,7 @@ class GlueJobService(AwsGlueService):
                 response = self.client.start_job_run(
                     JobName=job_name,
                     Arguments={
-                        '--job-instance': job_instance,
+                        '--job-instance': str(job_instance),
                         '--tables': tables,
                         '--incr-from': incr_from,
                         '--incr-to': incr_to,

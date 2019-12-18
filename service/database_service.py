@@ -63,23 +63,23 @@ class PostgresService(MetadataService):
         """
         conn, cur = self.create_db_conn()
         sql_stmt = sq.select_from_jobs
-
+        df, err = None, None
         try:
             cur.execute(sq.use_schema)
             df = sqlio.read_sql_query(sql_stmt, conn)
         except Exception as e:
             log.info("Error: select *")
             log.error(e)
-            raise
+            err = e
+            # raise
         finally:
             if conn:
                 cur.close()
                 conn.close()
                 log.info("successfully closed the db connection")
 
-        log.info("successfully executed function 'get_glue_jobs_from_db'")
-
-        return df
+        # log.info("successfully executed function 'get_glue_jobs_from_db'")
+        return df, err
 
     def is_active_job(self, job_name, job_instance):
         conn, cur = self.create_db_conn()
@@ -121,9 +121,9 @@ class PostgresService(MetadataService):
 
         return True
 
-    def check_table_exists(self, tables):
+    def check_table_exists(self, job_name, job_instance, tables):
         conn, cur = self.create_db_conn()
-        sql_stmt = sq.select_check_table_exists.format(tables)
+        sql_stmt = sq.select_check_table_exists.format(job_name, job_instance, tables)
 
         try:
             cur.execute(sq.use_schema)
@@ -140,9 +140,9 @@ class PostgresService(MetadataService):
 
         return recs_count[0]
 
-    def update_jobs_table_is_run(self):
+    def update_jobs_table_is_run(self, flag):
         conn, cur = self.create_db_conn()
-        sql_stmt = sq.update_table_jobs_is_run
+        sql_stmt = sq.update_table_jobs_is_run.format(flag)
 
         try:
             cur.execute(sq.use_schema)
@@ -156,7 +156,7 @@ class PostgresService(MetadataService):
                 conn.close()
                 log.info("successfully closed the db connection")
 
-        log.info("sync job run info is successfully updated")
+        log.info("column 'is_run_job' in 'jobs' table is successfully updated")
 
     def update_jobs_table(self):
         conn, cur = self.create_db_conn()

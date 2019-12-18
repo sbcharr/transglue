@@ -37,7 +37,7 @@ class MetadataService:
         raise NotImplementedError
 
     @abstractmethod
-    def check_table_exists(self, tables):
+    def check_table_exists(self, job_name, job_instance, tables):
 
         raise NotImplementedError
 
@@ -63,7 +63,7 @@ class MetadataService:
         raise NotImplementedError()
 
     @abstractmethod
-    def update_jobs_table_is_run(self):
+    def update_jobs_table_is_run(self, flag):
 
         raise NotImplementedError
 

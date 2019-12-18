@@ -3,7 +3,7 @@ create_control_schema = "CREATE SCHEMA IF NOT EXISTS job_control_admin;"
 create_table_jobs = "CREATE TABLE IF NOT EXISTS jobs ( \
     job_name varchar(50) PRIMARY KEY, \
     job_description varchar(100), \
-    job_param json not null, \
+    job_param jsonb not null, \
     created_timestamp timestamptz not null DEFAULT CURRENT_TIMESTAMP, \
     modified_timestamp timestamptz not null DEFAULT CURRENT_TIMESTAMP, \
     last_sync_timestamp timestamptz not null DEFAULT '1970-01-01 00:00:00', \
@@ -46,7 +46,7 @@ select_from_job_instances = "select job_run_id, status from job_instances where 
 select_from_job_details = "select table_name from job_details where job_name = '{}' and job_instance = {} \
                           and is_active = 'Y';"
 
-update_table_jobs_is_run = "update jobs set is_run_sync = 'Y';"
+update_table_jobs_is_run = "update jobs set is_run_sync = '{}';"
 
 update_table_jobs = "update jobs set last_sync_timestamp = '{}', is_run_sync = 'N';"
 
